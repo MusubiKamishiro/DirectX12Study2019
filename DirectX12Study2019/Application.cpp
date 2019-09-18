@@ -1,6 +1,9 @@
 #include <iostream>
 #include "Application.h"
 
+#include "Dx12Wrapper.h"
+#include "resource.h"
+
 constexpr int WINDOW_WIDTH	= 1280;
 constexpr int WINDOW_HEIGHT = 720;
 
@@ -24,20 +27,23 @@ LRESULT WindowProcedure(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 
 Application::Application()
 {
+	windowSize = Size(WINDOW_WIDTH, WINDOW_HEIGHT);
 }
 
 
-void Application::InitWindow()
+bool Application::InitWindow()
 {
 	w.cbSize = sizeof(WNDCLASSEX);
 	w.lpfnWndProc = (WNDPROC)WindowProcedure;	// コールバック関数の指定
 	w.lpszClassName = "DirectX12Study2019";		// アプリケーションクラス名
 	w.hInstance = GetModuleHandle(0);			// ハンドルの取得
+	w.hIcon = LoadIcon(w.hInstance, MAKEINTRESOURCE(IDI_ICON1));	// アイコンの変更
 	RegisterClassEx(&w);	// アプリケーションクラス
 
-	RECT wrc = { 0, 0, WINDOW_WIDTH, WINDOW_HEIGHT };	// ウィンドウサイズを決める
-	AdjustWindowRect(&wrc, WS_OVERLAPPEDWINDOW, false);	// ウィンドウのサイズを補正する
+	RECT wrc = { 0, 0, windowSize.width, windowSize.height };	// ウィンドウサイズを決める
+	AdjustWindowRect(&wrc, WS_OVERLAPPEDWINDOW, false);			// ウィンドウのサイズを補正する
 
+	// ウィンドウ作成
 	hwnd = CreateWindow(w.lpszClassName,	// クラス名指定
 		"2度目のDirectX12",		// タイトルバーの文字
 		WS_OVERLAPPEDWINDOW,	// タイトルバーと境界線があるウィンドウ
@@ -64,6 +70,12 @@ void Application::InitWindow()
 		std::cout << (TCHAR*)messageBuffer << std::endl;
 		LocalFree(messageBuffer);
 	}
+	else
+	{
+		return true;
+	}
+
+	return false;
 }
 
 Application::~Application()
@@ -72,13 +84,13 @@ Application::~Application()
 
 bool Application::Initialize()
 {
-	InitWindow();
-
-	return true;
+	return InitWindow();
 }
 
 void Application::Run()
 {
+	dx12Wrapper = std::make_shared<Dx12Wrapper>(hwnd);
+
 	ShowWindow(hwnd, SW_SHOW);
 	MSG msg = {};
 	while (true)
@@ -101,4 +113,9 @@ void Application::Run()
 void Application::Terminate()
 {
 	UnregisterClass(w.lpszClassName, w.hInstance);	// 使用しなくなるため登録解除
+}
+
+Size Application::GetWindowSize()
+{
+	return windowSize;
 }
