@@ -107,6 +107,8 @@ void Application::Run()
 		{
 			break;
 		}
+
+		dx12Wrapper->Update();
 	}
 }
 

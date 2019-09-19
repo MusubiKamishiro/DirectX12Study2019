@@ -4,6 +4,17 @@
 #pragma comment(lib,"d3d12.lib")
 #pragma comment(lib,"dxgi.lib")
 
+void Dx12Wrapper::CreateDebugLayer(HRESULT& result)
+{
+	ID3D12Debug* debug;
+	result = D3D12GetDebugInterface(IID_PPV_ARGS(&debug));
+	if (SUCCEEDED(result))
+	{
+		debug->EnableDebugLayer();
+	}
+	debug->Release();
+}
+
 void Dx12Wrapper::InitFeatureLevel(HRESULT& result)
 {
 	D3D_FEATURE_LEVEL levels[] = {
@@ -71,17 +82,16 @@ void Dx12Wrapper::CreateRenderTarget(HRESULT& result)
 
 	DXGI_SWAP_CHAIN_DESC swapCDesc = {};
 	swapChain->GetDesc(&swapCDesc);
-	int renderTargetsNum = swapCDesc.BufferCount;
 	// レンダーターゲット数ぶん確保
-	renderTargets.resize(renderTargetsNum);
+	backBuffers.resize(swapCDesc.BufferCount);
 	// レンダーターゲットの作成
 	D3D12_CPU_DESCRIPTOR_HANDLE cpuDescH = rtvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
 	// 各ﾃﾞｽｸﾘﾌﾟﾀｰの使用するｻｲｽﾞを計算しとく
 	auto rtvSize = dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-	for (int i = 0; i < renderTargetsNum; ++i)
+	for (int i = 0; i < swapCDesc.BufferCount; ++i)
 	{
-		result = swapChain->GetBuffer(i, IID_PPV_ARGS(&renderTargets[i]));	// キャンバスを取得
-		dev->CreateRenderTargetView(renderTargets[i], nullptr, cpuDescH);	// キャンバスと職人を紐づける
+		result = swapChain->GetBuffer(i, IID_PPV_ARGS(&backBuffers[i]));	// キャンバスを取得
+		dev->CreateRenderTargetView(backBuffers[i], nullptr, cpuDescH);		// キャンバスと職人を紐づける
 		cpuDescH.ptr += rtvSize;	// レンダーターゲットビューのサイズぶんずらす
 	}
 }
@@ -95,6 +105,15 @@ void Dx12Wrapper::InitScreen()
 	float clearColor[] = { 0.0f, 1.0f, 0.0f, 1.0f };				// クリアカラー設定
 	cmdList->OMSetRenderTargets(1, &heapStart, false, nullptr);		// レンダーターゲット設定
 	cmdList->ClearRenderTargetView(heapStart, clearColor, 0, nullptr);	// クリア
+
+	BarrierDesc.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+	BarrierDesc.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+	BarrierDesc.Transition.pResource = backBuffers[bbIdx];
+	BarrierDesc.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+	BarrierDesc.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
+	BarrierDesc.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
+	cmdList->ResourceBarrier(1, &BarrierDesc);
+
 	cmdList->Close();
 }
 
@@ -102,11 +121,24 @@ void Dx12Wrapper::ExecuteCmd()
 {
 	ID3D12CommandList* cmdLists[] = { cmdList };
 	cmdQueue->ExecuteCommandLists(1, cmdLists);
+	cmdQueue->Signal(fence, ++fenceValue);
+}
+
+void Dx12Wrapper::WaitExecute()
+{
+	while (fence->GetCompletedValue() != fenceValue)
+	{
+		;// 待つだけなので何もしないよ
+	}
 }
 
 Dx12Wrapper::Dx12Wrapper(HWND hwnd)
 {
 	HRESULT result = S_OK;
+
+#ifdef _DEBUG
+	CreateDebugLayer(result);
+#endif // _DEBUG
 
 	InitFeatureLevel(result);
 	CreateSwapChain(result, hwnd);
@@ -115,6 +147,8 @@ Dx12Wrapper::Dx12Wrapper(HWND hwnd)
 	// ｺﾏﾝﾄﾞｱﾛｹｰﾀとｺﾏﾝﾄﾞﾘｽﾄの生成
 	result = dev->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&cmdAllocator));
 	result = dev->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, cmdAllocator, nullptr, IID_PPV_ARGS(&cmdList));
+	// フェンスの作成
+	result = dev->CreateFence(fenceValue, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence));
 
 	// 命令を呼ぶ前にリセット
 	cmdAllocator->Reset();
@@ -122,8 +156,13 @@ Dx12Wrapper::Dx12Wrapper(HWND hwnd)
 
 	InitScreen();
 	ExecuteCmd();
+	WaitExecute();
 
 	swapChain->Present(0, 0);
+
+	BarrierDesc.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
+	BarrierDesc.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
+	cmdList->ResourceBarrier(1, &BarrierDesc);
 }
 
 

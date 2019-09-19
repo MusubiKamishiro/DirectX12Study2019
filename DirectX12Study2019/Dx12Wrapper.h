@@ -22,6 +22,8 @@ private:
 	// 待ちのためのフェンス
 	ID3D12Fence* fence = nullptr;
 
+	// デバッグレイヤの作成
+	void CreateDebugLayer(HRESULT& result);
 	// フィーチャーレベルの選択
 	void InitFeatureLevel(HRESULT& result);
 	// スワップチェインの作成
@@ -33,9 +35,15 @@ private:
 	void InitScreen();
 	// コマンドキューに投げる
 	void ExecuteCmd();
+	// 待ち
+	void WaitExecute();
 	
 	ID3D12DescriptorHeap* rtvDescriptorHeap = nullptr;	// レンダーターゲットビュー用のヒープ
-	std::vector<ID3D12Resource*> renderTargets;
+	std::vector<ID3D12Resource*> backBuffers;
+
+	UINT64 fenceValue = 0;
+
+	D3D12_RESOURCE_BARRIER BarrierDesc = {};	// バリア
 
 
 public:
