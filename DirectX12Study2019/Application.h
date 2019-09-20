@@ -9,8 +9,8 @@ struct Size
 	Size() {};
 	Size(int inw, int inh) : width(inw), height(inh) {};
 
-	int width;
-	int height;
+	int width = 0;
+	int height = 0;
 };
 
 class Application
