@@ -173,11 +173,11 @@ void Dx12Wrapper::InitShader(HRESULT& result)
 	rootParam.DescriptorTable.NumDescriptorRanges = 1;
 
 	InitRootSignatur(result);
+	InitPipelineState(result);
 }
 
 void Dx12Wrapper::InitRootSignatur(HRESULT& result)
 {
-	ID3D12RootSignature* rootSignature = nullptr;	// これが最終的に欲しいオブジェクト
 	ID3DBlob* signature = nullptr;		// ルートシグネチャをつくるための材料
 	ID3DBlob* error = nullptr;			// エラー出た時の対処
 
@@ -189,6 +189,51 @@ void Dx12Wrapper::InitRootSignatur(HRESULT& result)
 	// ルートシグネチャの作成
 	result = dev->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(),
 																				IID_PPV_ARGS(&rootSignature));
+}
+
+void Dx12Wrapper::InitPipelineState(HRESULT& result)
+{
+	// 頂点レイアウト
+	D3D12_INPUT_ELEMENT_DESC layouts[] = { {"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT,
+														D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0} };
+
+	// パイプラインステートを作る
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC gpsDesc = {};
+	//gpsDesc = CD3D12_BLEND_DESC(D3D12_DEFAULT);
+
+	// ルートシグネチャと頂点レイアウト
+	gpsDesc.pRootSignature = rootSignature;
+	gpsDesc.InputLayout.pInputElementDescs = layouts;
+	gpsDesc.InputLayout.NumElements = _countof(layouts);
+
+	// シェーダ系
+	//gpsDesc.VS = CD3DX12_SHADER_BYTECODE(vertexShader);		// 頂点シェーダ
+	//gpsDesc.PS = CD3DX12_SHADER_BYTECODE(pixelShader);		// ピクセルシェーダ
+
+	// レンダターゲット
+	gpsDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;		// このﾀｰｹﾞｯﾄ数と設定するフォーマット数は
+	gpsDesc.NumRenderTargets = 1;							// 一致させておく
+
+	// 深度ステンシル
+	gpsDesc.DepthStencilState.DepthEnable = true;			// あとで
+	gpsDesc.DepthStencilState.StencilEnable = false;		// あとで
+	gpsDesc.DSVFormat = DXGI_FORMAT_D32_FLOAT;				// 必須
+	gpsDesc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
+	gpsDesc.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
+
+	// ラスタライザ
+	//gpsDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+	gpsDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;	// 表面だけじゃなくて、裏面も描画するようにするよ
+
+	// その他
+	//gpsDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+	gpsDesc.NodeMask = 0;
+	gpsDesc.SampleDesc.Count = 1;		// いる
+	gpsDesc.SampleDesc.Quality = 0;		// いる
+	gpsDesc.SampleMask = 0xffffffff;	// 全部1
+	gpsDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;	// 三角形
+
+	result = dev->CreateGraphicsPipelineState(&gpsDesc, IID_PPV_ARGS(&pipelineState));
 }
 
 void Dx12Wrapper::ExecuteCmd()

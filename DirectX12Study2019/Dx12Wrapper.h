@@ -54,6 +54,10 @@ private:
 	ID3DBlob* pixelShader = nullptr;	// ピクセルシェーダ
 	// ルートシグネチャの初期化
 	void InitRootSignatur(HRESULT& result);
+	ID3D12RootSignature* rootSignature = nullptr;	// これが最終的に欲しいオブジェクト
+	// パイプラインステートの初期化
+	void InitPipelineState(HRESULT& result);
+	ID3D12PipelineState* pipelineState = nullptr;
 
 	// コマンドキューに投げる
 	void ExecuteCmd();
