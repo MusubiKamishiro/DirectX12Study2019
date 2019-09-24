@@ -14,8 +14,6 @@ struct Vector3
 
 struct Vertex {
 	DirectX::XMFLOAT3 pos;		// 座標
-	DirectX::XMFLOAT2 uv;		// UV座標
-	//DirectX::XMFLOAT3 normal;	// 法線
 };
 
 class Dx12Wrapper
@@ -52,6 +50,8 @@ private:
 	void InitShader(HRESULT& result);
 	ID3DBlob* vertexShader = nullptr;	// 頂点シェーダ
 	ID3DBlob* pixelShader = nullptr;	// ピクセルシェーダ
+	D3D12_VIEWPORT viewport;	// ビューポート
+	D3D12_RECT scissorRect;		// シザーレクト
 	// ルートシグネチャの初期化
 	void InitRootSignatur(HRESULT& result);
 	ID3D12RootSignature* rootSignature = nullptr;	// これが最終的に欲しいオブジェクト

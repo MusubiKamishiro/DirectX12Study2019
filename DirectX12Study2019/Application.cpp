@@ -109,6 +109,7 @@ void Application::Run()
 		}
 
 		dx12Wrapper->Update();
+		dx12Wrapper->Draw();
 	}
 }
 

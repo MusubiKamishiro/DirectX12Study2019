@@ -1,11 +1,13 @@
 #include "Dx12Wrapper.h"
 #include <d3dcompiler.h>
+#include "d3dx12.h"
 
 #include "Application.h"
 
 #pragma comment(lib,"d3d12.lib")
 #pragma comment(lib,"dxgi.lib")
 #pragma comment(lib, "d3dcompiler.lib")
+
 
 void Dx12Wrapper::CreateDebugLayer(HRESULT& result)
 {
@@ -132,8 +134,6 @@ void Dx12Wrapper::CreateVertexBuffer(HRESULT& result)
 	vbView.BufferLocation = vertexBuffer->GetGPUVirtualAddress();
 	vbView.StrideInBytes = sizeof(Vertex);	// 頂点1つあたりのバイト数
 	vbView.SizeInBytes = sizeof(vertices);	// データ全体のサイズ
-
-	cmdList->IASetVertexBuffers(0, 1, &vbView);
 }
 
 void Dx12Wrapper::InitScreen()
@@ -146,26 +146,14 @@ void Dx12Wrapper::InitScreen()
 	cmdList->OMSetRenderTargets(1, &heapStart, false, nullptr);		// レンダーターゲット設定
 	cmdList->ClearRenderTargetView(heapStart, clearColor, 0, nullptr);	// クリア
 
-	BarrierDesc.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-	BarrierDesc.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-	BarrierDesc.Transition.pResource = backBuffers[bbIdx];
-	BarrierDesc.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-	BarrierDesc.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
-	BarrierDesc.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
-	cmdList->ResourceBarrier(1, &BarrierDesc);
-
-	BarrierDesc.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
-	BarrierDesc.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
-	cmdList->ResourceBarrier(1, &BarrierDesc);
-
 	cmdList->Close();
 }
 
 void Dx12Wrapper::InitShader(HRESULT& result)
 {
-	result = D3DCompileFromFile(L"Shader.hlsl", nullptr, nullptr, "BasicVS", "vs_5_0",
+	result = D3DCompileFromFile(L"Shader.hlsl", nullptr, nullptr, "vs", "vs_5_0",
 						D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION, 0, &vertexShader, nullptr);
-	result = D3DCompileFromFile(L"Shader.hlsl", nullptr, nullptr, "BasicPS", "ps_5_0",
+	result = D3DCompileFromFile(L"Shader.hlsl", nullptr, nullptr, "ps", "ps_5_0",
 						D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION, 0, &pixelShader, nullptr);
 
 	D3D12_ROOT_PARAMETER rootParam = {};
@@ -174,6 +162,21 @@ void Dx12Wrapper::InitShader(HRESULT& result)
 
 	InitRootSignatur(result);
 	InitPipelineState(result);
+
+	auto wsize = Application::Instance().GetWindowSize();
+	// ビューポート設定
+	viewport.TopLeftX = 0;
+	viewport.TopLeftY = 0;
+	viewport.Width = wsize.width;
+	viewport.Height = wsize.height;
+	viewport.MaxDepth = 1.0f;	// カメラからの距離(遠いほう)
+	viewport.MinDepth = 0.0f;	// カメラからの距離(近いほう)
+
+	// シザー(切り取り)矩形設定
+	scissorRect.left = 0;
+	scissorRect.top = 0;
+	scissorRect.right = wsize.width;
+	scissorRect.bottom = wsize.height;
 }
 
 void Dx12Wrapper::InitRootSignatur(HRESULT& result)
@@ -199,7 +202,6 @@ void Dx12Wrapper::InitPipelineState(HRESULT& result)
 
 	// パイプラインステートを作る
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC gpsDesc = {};
-	//gpsDesc = CD3D12_BLEND_DESC(D3D12_DEFAULT);
 
 	// ルートシグネチャと頂点レイアウト
 	gpsDesc.pRootSignature = rootSignature;
@@ -207,26 +209,26 @@ void Dx12Wrapper::InitPipelineState(HRESULT& result)
 	gpsDesc.InputLayout.NumElements = _countof(layouts);
 
 	// シェーダ系
-	//gpsDesc.VS = CD3DX12_SHADER_BYTECODE(vertexShader);		// 頂点シェーダ
-	//gpsDesc.PS = CD3DX12_SHADER_BYTECODE(pixelShader);		// ピクセルシェーダ
+	gpsDesc.VS = CD3DX12_SHADER_BYTECODE(vertexShader);		// 頂点シェーダ
+	gpsDesc.PS = CD3DX12_SHADER_BYTECODE(pixelShader);		// ピクセルシェーダ
 
 	// レンダターゲット
 	gpsDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;		// このﾀｰｹﾞｯﾄ数と設定するフォーマット数は
 	gpsDesc.NumRenderTargets = 1;							// 一致させておく
 
 	// 深度ステンシル
-	gpsDesc.DepthStencilState.DepthEnable = true;			// あとで
+	gpsDesc.DepthStencilState.DepthEnable = false;			// あとで
 	gpsDesc.DepthStencilState.StencilEnable = false;		// あとで
 	gpsDesc.DSVFormat = DXGI_FORMAT_D32_FLOAT;				// 必須
 	gpsDesc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
 	gpsDesc.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
 
 	// ラスタライザ
-	//gpsDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+	gpsDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
 	gpsDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;	// 表面だけじゃなくて、裏面も描画するようにするよ
 
 	// その他
-	//gpsDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+	gpsDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
 	gpsDesc.NodeMask = 0;
 	gpsDesc.SampleDesc.Count = 1;		// いる
 	gpsDesc.SampleDesc.Quality = 0;		// いる
@@ -245,7 +247,7 @@ void Dx12Wrapper::ExecuteCmd()
 
 void Dx12Wrapper::WaitExecute()
 {
-	while (fence->GetCompletedValue() != fenceValue)
+	while (fence->GetCompletedValue() < fenceValue)
 	{
 		;// 待つだけなので何もしないよ
 	}
@@ -270,30 +272,22 @@ Dx12Wrapper::Dx12Wrapper(HWND hwnd)
 	result = dev->CreateFence(fenceValue, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence));
 
 	// 命令を呼ぶ前にリセット
-	cmdAllocator->Reset();
-	cmdList->Reset(cmdAllocator, nullptr);
+	//cmdAllocator->Reset();
+	//cmdList->Reset(cmdAllocator, nullptr);
 
 	D3D12_RESOURCE_BARRIER BarrierDesc = {};
 	BarrierDesc.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
 	BarrierDesc.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
 	BarrierDesc.Transition.pResource = backBuffers[bbIdx];
 	BarrierDesc.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-	BarrierDesc.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
-	BarrierDesc.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
+	BarrierDesc.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
+	BarrierDesc.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
 	cmdList->ResourceBarrier(1, &BarrierDesc);
 
 	CreateVertexBuffer(result);
 
 	InitScreen();
 	InitShader(result);
-	ExecuteCmd();
-	WaitExecute();
-
-	swapChain->Present(0, 0);
-
-	BarrierDesc.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
-	BarrierDesc.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
-	cmdList->ResourceBarrier(1, &BarrierDesc);
 }
 
 
@@ -303,8 +297,47 @@ Dx12Wrapper::~Dx12Wrapper()
 
 void Dx12Wrapper::Update()
 {
+
 }
 
 void Dx12Wrapper::Draw()
 {
+	// 命令のクリア
+	cmdAllocator->Reset();
+	cmdList->Reset(cmdAllocator, pipelineState);
+	cmdList->SetGraphicsRootSignature(rootSignature);
+
+	// 画面のクリア
+	auto heapStart = rtvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
+	bbIdx = swapChain->GetCurrentBackBufferIndex();		// ﾊﾞｯｸﾊﾞｯﾌｧｲﾝﾃﾞｯｽｸを調べる
+	heapStart.ptr += bbIdx * dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+	float clearColor[] = { 0.0f, 1.0f, 0.0f, 1.0f };				// クリアカラー設定
+	cmdList->OMSetRenderTargets(1, &heapStart, false, nullptr);		// レンダーターゲット設定
+	cmdList->ClearRenderTargetView(heapStart, clearColor, 0, nullptr);	// クリア
+
+	// ビューポートとシザー設定
+	cmdList->RSSetViewports(1, &viewport);
+	cmdList->RSSetScissorRects(1, &scissorRect);
+
+	// バリアを解除
+	cmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(backBuffers[bbIdx],
+		D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
+
+	
+	cmdList->SetGraphicsRootSignature(rootSignature);
+
+	cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+	cmdList->IASetVertexBuffers(0, 1, &vbView);
+
+	cmdList->DrawInstanced(3, 1, 0, 0);
+
+	// バリアをセット
+	cmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(backBuffers[bbIdx],
+		D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
+
+	cmdList->Close();	// クローズ
+	ExecuteCmd();
+	WaitExecute();
+
+	swapChain->Present(1, 0);	// 描画
 }
