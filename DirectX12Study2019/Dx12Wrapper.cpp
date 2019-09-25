@@ -29,11 +29,32 @@ void Dx12Wrapper::InitFeatureLevel(HRESULT& result)
 		D3D_FEATURE_LEVEL_11_0,
 	};
 
+	// グラフィックスアダプタを列挙させる
+	std::vector<IDXGIAdapter*> adapters;
+	IDXGIAdapter* adapter = nullptr;
+	for (int i = 0; dxgiFactory->EnumAdapters(i, &adapter) != DXGI_ERROR_NOT_FOUND; ++i)
+	{
+		adapters.push_back(adapter);
+	}
+	// その中からNVIDIAを探す
+	for (auto& adpt : adapters)
+	{
+		DXGI_ADAPTER_DESC aDesc = {};
+		adpt->GetDesc(&aDesc);
+		std::wstring strDesc = aDesc.Description;
+		if (strDesc.find(L"NVIDIA") != std::string::npos)
+		{
+			// NVIDIAアダプタを強制
+			adapter = adpt;
+			break;
+		}
+	}
+
 	// レベルの高いものから検証し、成功したレベルを適用する
 	for (auto& l : levels)
 	{
 		// ディスプレイアダプターを表すデバイスの作成
-		result = D3D12CreateDevice(nullptr, l, IID_PPV_ARGS(&dev));
+		result = D3D12CreateDevice(adapter, l, IID_PPV_ARGS(&dev));
 
 		if (SUCCEEDED(result))
 		{
@@ -44,9 +65,6 @@ void Dx12Wrapper::InitFeatureLevel(HRESULT& result)
 
 void Dx12Wrapper::CreateSwapChain(HRESULT& result, HWND hwnd)
 {
-	// DXGIファクトリの作成
-	result = CreateDXGIFactory1(IID_PPV_ARGS(&dxgiFactory));
-
 	// コマンドキューの作成
 	D3D12_COMMAND_QUEUE_DESC cmdQDesc = {};
 	cmdQDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
@@ -103,7 +121,7 @@ void Dx12Wrapper::CreateRenderTarget(HRESULT& result)
 
 void Dx12Wrapper::CreateVertexBuffer(HRESULT& result)
 {
-	DirectX::XMFLOAT3 vertices[] = { {-1.0f, -1.0f, 0.0f}, {-1.0f, 1.0f, 0.0f}, {1.0f, -1.0f, 0.0f} };
+	DirectX::XMFLOAT3 vertices[] = { {-0.4f, -0.4f, 0.0f}, {-0.4f, 0.4f, 0.0f},  {0.4f, -0.4f, 0.0f}, {0.4f, 0.4f, 0.0f} };
 
 	D3D12_HEAP_PROPERTIES heapprop = {};
 	heapprop.Type = D3D12_HEAP_TYPE_UPLOAD;
@@ -125,6 +143,12 @@ void Dx12Wrapper::CreateVertexBuffer(HRESULT& result)
 	result = dev->CreateCommittedResource(&heapprop, D3D12_HEAP_FLAG_NONE, &resdesc,
 								D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&vertexBuffer));
 
+	std::vector<unsigned short> indices = { 0,1,2, 1,2,3 };	// 頂点を使用する順番
+	// インデックスバッファの作成
+	result = dev->CreateCommittedResource(&heapprop, D3D12_HEAP_FLAG_NONE,
+		&CD3DX12_RESOURCE_DESC::Buffer(indices.size() * sizeof(indices[0])),
+		D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&indexBuffer));
+
 	D3D12_RANGE range = { 0,0 };
 	DirectX::XMFLOAT3* vertexMap = nullptr;
 	result = vertexBuffer->Map(0, nullptr, (void**)& vertexMap);
@@ -134,20 +158,12 @@ void Dx12Wrapper::CreateVertexBuffer(HRESULT& result)
 	vbView.BufferLocation = vertexBuffer->GetGPUVirtualAddress();
 	vbView.StrideInBytes = sizeof(Vertex);	// 頂点1つあたりのバイト数
 	vbView.SizeInBytes = sizeof(vertices);	// データ全体のサイズ
+
+	ibView.BufferLocation = indexBuffer->GetGPUVirtualAddress();	// バッファの場所
+	ibView.Format = DXGI_FORMAT_R16_UINT;	// フォーマット(shortなのでR16)
+	ibView.SizeInBytes = indices.size() * sizeof(indices[0]);		// 総サイズ
 }
 
-void Dx12Wrapper::InitScreen()
-{
-	// 画面のクリア
-	auto heapStart = rtvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
-	bbIdx = swapChain->GetCurrentBackBufferIndex();		// ﾊﾞｯｸﾊﾞｯﾌｧｲﾝﾃﾞｯｽｸを調べる
-	heapStart.ptr += bbIdx * dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-	float clearColor[] = { 0.0f, 1.0f, 0.0f, 1.0f };				// クリアカラー設定
-	cmdList->OMSetRenderTargets(1, &heapStart, false, nullptr);		// レンダーターゲット設定
-	cmdList->ClearRenderTargetView(heapStart, clearColor, 0, nullptr);	// クリア
-
-	cmdList->Close();
-}
 
 void Dx12Wrapper::InitShader(HRESULT& result)
 {
@@ -167,8 +183,8 @@ void Dx12Wrapper::InitShader(HRESULT& result)
 	// ビューポート設定
 	viewport.TopLeftX = 0;
 	viewport.TopLeftY = 0;
-	viewport.Width = wsize.width;
-	viewport.Height = wsize.height;
+	viewport.Width = static_cast<FLOAT>(wsize.width);
+	viewport.Height = static_cast<FLOAT>(wsize.height);
 	viewport.MaxDepth = 1.0f;	// カメラからの距離(遠いほう)
 	viewport.MinDepth = 0.0f;	// カメラからの距離(近いほう)
 
@@ -238,6 +254,33 @@ void Dx12Wrapper::InitPipelineState(HRESULT& result)
 	result = dev->CreateGraphicsPipelineState(&gpsDesc, IID_PPV_ARGS(&pipelineState));
 }
 
+void Dx12Wrapper::ClearCmd(ID3D12PipelineState* pipelinestate, ID3D12RootSignature* rootsignature)
+{
+	cmdAllocator->Reset();
+	cmdList->Reset(cmdAllocator, pipelinestate);
+	cmdList->SetGraphicsRootSignature(rootsignature);
+}
+
+void Dx12Wrapper::UnlockBarrier(ID3D12Resource* buffer)
+{
+	BarrierDesc.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+	BarrierDesc.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+	BarrierDesc.Transition.pResource = buffer;
+	BarrierDesc.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+	BarrierDesc.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
+	BarrierDesc.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
+	// バリアを解除
+	cmdList->ResourceBarrier(1, &BarrierDesc);
+}
+
+void Dx12Wrapper::SetBarrier()
+{
+	BarrierDesc.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
+	BarrierDesc.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
+	// バリアをセット
+	cmdList->ResourceBarrier(1, &BarrierDesc);
+}
+
 void Dx12Wrapper::ExecuteCmd()
 {
 	ID3D12CommandList* cmdLists[] = { cmdList };
@@ -261,6 +304,9 @@ Dx12Wrapper::Dx12Wrapper(HWND hwnd)
 	CreateDebugLayer(result);
 #endif // _DEBUG
 
+	// DXGIファクトリの作成
+	result = CreateDXGIFactory1(IID_PPV_ARGS(&dxgiFactory));
+
 	InitFeatureLevel(result);
 	CreateSwapChain(result, hwnd);
 	CreateRenderTarget(result);
@@ -271,28 +317,35 @@ Dx12Wrapper::Dx12Wrapper(HWND hwnd)
 	// フェンスの作成
 	result = dev->CreateFence(fenceValue, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence));
 
-	// 命令を呼ぶ前にリセット
-	//cmdAllocator->Reset();
-	//cmdList->Reset(cmdAllocator, nullptr);
-
-	D3D12_RESOURCE_BARRIER BarrierDesc = {};
-	BarrierDesc.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-	BarrierDesc.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-	BarrierDesc.Transition.pResource = backBuffers[bbIdx];
-	BarrierDesc.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-	BarrierDesc.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
-	BarrierDesc.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
-	cmdList->ResourceBarrier(1, &BarrierDesc);
-
 	CreateVertexBuffer(result);
 
-	InitScreen();
 	InitShader(result);
+
+	cmdList->Close();
 }
 
 
 Dx12Wrapper::~Dx12Wrapper()
 {
+	cmdAllocator->Release();
+	cmdList->Release();
+	cmdQueue->Release();
+	dxgiFactory->Release();
+	swapChain->Release();
+	dev->Release();
+	fence->Release();
+	vertexShader->Release();
+	pixelShader->Release();
+	rootSignature->Release();
+	pipelineState->Release();
+
+	rtvDescriptorHeap->Release();
+	vertexBuffer->Release();
+	indexBuffer->Release();
+	for (auto& backBuffer : backBuffers)
+	{
+		backBuffer->Release();
+	}
 }
 
 void Dx12Wrapper::Update()
@@ -303,41 +356,37 @@ void Dx12Wrapper::Update()
 void Dx12Wrapper::Draw()
 {
 	// 命令のクリア
-	cmdAllocator->Reset();
-	cmdList->Reset(cmdAllocator, pipelineState);
-	cmdList->SetGraphicsRootSignature(rootSignature);
-
-	// 画面のクリア
-	auto heapStart = rtvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
-	bbIdx = swapChain->GetCurrentBackBufferIndex();		// ﾊﾞｯｸﾊﾞｯﾌｧｲﾝﾃﾞｯｽｸを調べる
-	heapStart.ptr += bbIdx * dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-	float clearColor[] = { 0.0f, 1.0f, 0.0f, 1.0f };				// クリアカラー設定
-	cmdList->OMSetRenderTargets(1, &heapStart, false, nullptr);		// レンダーターゲット設定
-	cmdList->ClearRenderTargetView(heapStart, clearColor, 0, nullptr);	// クリア
+	ClearCmd(pipelineState, rootSignature);
 
 	// ビューポートとシザー設定
 	cmdList->RSSetViewports(1, &viewport);
 	cmdList->RSSetScissorRects(1, &scissorRect);
 
-	// バリアを解除
-	cmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(backBuffers[bbIdx],
-		D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
+	auto heapStart = rtvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
+	bbIdx = swapChain->GetCurrentBackBufferIndex();		// ﾊﾞｯｸﾊﾞｯﾌｧｲﾝﾃﾞｯｽｸを調べる
+	heapStart.ptr += bbIdx * dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+	float clearColor[] = { 0.0f, 1.0f, 0.0f, 1.0f };				// クリアカラー設定
+	cmdList->OMSetRenderTargets(1, &heapStart, false, nullptr);		// レンダーターゲット設定
 
-	
-	cmdList->SetGraphicsRootSignature(rootSignature);
+	// バリアの解除(ここから書き込みが始まる)
+	UnlockBarrier(backBuffers[bbIdx]);
+
+	// 画面のクリア(これも書き込みに入る)
+	cmdList->ClearRenderTargetView(heapStart, clearColor, 0, nullptr);	// クリア
 
 	cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
 	cmdList->IASetVertexBuffers(0, 1, &vbView);
+	cmdList->IASetIndexBuffer(&ibView);
 
-	cmdList->DrawInstanced(3, 1, 0, 0);
+	cmdList->DrawInstanced(4, 2, 0, 0);
 
-	// バリアをセット
-	cmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(backBuffers[bbIdx],
-		D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
+	// バリアのセット
+	SetBarrier();
 
 	cmdList->Close();	// クローズ
 	ExecuteCmd();
 	WaitExecute();
+
 
 	swapChain->Present(1, 0);	// 描画
 }

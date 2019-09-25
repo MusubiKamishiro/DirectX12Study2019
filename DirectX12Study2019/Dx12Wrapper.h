@@ -44,8 +44,6 @@ private:
 	// 頂点バッファの作成
 	void CreateVertexBuffer(HRESULT& result);
 
-	// 画面の初期化
-	void InitScreen();
 	// シェーダの初期化
 	void InitShader(HRESULT& result);
 	ID3DBlob* vertexShader = nullptr;	// 頂点シェーダ
@@ -59,6 +57,14 @@ private:
 	void InitPipelineState(HRESULT& result);
 	ID3D12PipelineState* pipelineState = nullptr;
 
+	// 命令のクリア
+	void ClearCmd(ID3D12PipelineState* pipelinestate, ID3D12RootSignature* rootsignature);
+
+	// バリアの解除
+	void UnlockBarrier(ID3D12Resource* buffer);
+	// バリアのセット
+	void SetBarrier();
+
 	// コマンドキューに投げる
 	void ExecuteCmd();
 	// 待ち
@@ -67,14 +73,15 @@ private:
 	ID3D12DescriptorHeap* rtvDescriptorHeap = nullptr;	// レンダーターゲットビュー用のヒープ
 	std::vector<ID3D12Resource*> backBuffers;
 
-	ID3D12Resource* vertexBuffer = nullptr;		// 頂点バッファ
+	ID3D12Resource* vertexBuffer = nullptr;	// 頂点バッファ
+	ID3D12Resource* indexBuffer = nullptr;	// インデックスバッファ
 	D3D12_VERTEX_BUFFER_VIEW vbView = {};	// 頂点バッファビュー
+	D3D12_INDEX_BUFFER_VIEW ibView = {};	// インデックスバッファビュー
 
 	UINT64 fenceValue = 0;
 	UINT bbIdx = 0;
-
-	D3D12_RESOURCE_BARRIER BarrierDesc = {};	// バリア
 	
+	D3D12_RESOURCE_BARRIER BarrierDesc = {};	// バリア
 
 public:
 	Dx12Wrapper(HWND hwnd);
