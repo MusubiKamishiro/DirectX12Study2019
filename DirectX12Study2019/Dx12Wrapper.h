@@ -13,7 +13,8 @@ struct Vector3
 };
 
 struct Vertex {
-	DirectX::XMFLOAT3 pos;		// 座標
+	DirectX::XMFLOAT3 pos;	// 座標
+	DirectX::XMFLOAT2 uv;	// UV座標
 };
 
 class Dx12Wrapper
@@ -34,28 +35,32 @@ private:
 	ID3D12Fence* fence = nullptr;
 
 	// デバッグレイヤの作成
-	void CreateDebugLayer(HRESULT& result);
+	void CreateDebugLayer();
 	// フィーチャーレベルの選択
-	void InitFeatureLevel(HRESULT& result);
+	void InitFeatureLevel();
 	// スワップチェインの作成
-	void CreateSwapChain(HRESULT& result, HWND hwnd);
+	void CreateSwapChain(HWND hwnd);
 	// レンダーターゲットの作成
-	void CreateRenderTarget(HRESULT& result);
+	void CreateRenderTarget();
 	// 頂点バッファの作成
-	void CreateVertexBuffer(HRESULT& result);
+	void CreateVertexBuffer();
 
 	// シェーダの初期化
-	void InitShader(HRESULT& result);
+	void InitShader();
 	ID3DBlob* vertexShader = nullptr;	// 頂点シェーダ
 	ID3DBlob* pixelShader = nullptr;	// ピクセルシェーダ
 	D3D12_VIEWPORT viewport;	// ビューポート
 	D3D12_RECT scissorRect;		// シザーレクト
 	// ルートシグネチャの初期化
-	void InitRootSignatur(HRESULT& result);
+	void InitRootSignatur();
 	ID3D12RootSignature* rootSignature = nullptr;	// これが最終的に欲しいオブジェクト
 	// パイプラインステートの初期化
-	void InitPipelineState(HRESULT& result);
+	void InitPipelineState();
 	ID3D12PipelineState* pipelineState = nullptr;
+
+	// テクスチャリソースの作成
+	ID3D12Resource* CreateTextureResource(ID3D12Resource* buff, const unsigned int width = 4,
+												const unsigned int height = 4, const unsigned int arraySize = 1);
 
 	// 命令のクリア
 	void ClearCmd(ID3D12PipelineState* pipelinestate, ID3D12RootSignature* rootsignature);
@@ -82,6 +87,12 @@ private:
 	UINT bbIdx = 0;
 	
 	D3D12_RESOURCE_BARRIER BarrierDesc = {};	// バリア
+
+	///ここから一時的な試験のための物
+	///確認が終わり次第削除すること
+	ID3D12Resource* texBuff = nullptr;
+	ID3D12DescriptorHeap* texHeap = nullptr;
+	void CreateTex();
 
 public:
 	Dx12Wrapper(HWND hwnd);

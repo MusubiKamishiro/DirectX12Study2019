@@ -1,5 +1,6 @@
 #include "Dx12Wrapper.h"
 #include <d3dcompiler.h>
+#include <DirectXTex.h>
 #include "d3dx12.h"
 
 #include "Application.h"
@@ -7,12 +8,13 @@
 #pragma comment(lib,"d3d12.lib")
 #pragma comment(lib,"dxgi.lib")
 #pragma comment(lib, "d3dcompiler.lib")
+#pragma comment(lib, "DirectXTex.lib")
 
 
-void Dx12Wrapper::CreateDebugLayer(HRESULT& result)
+void Dx12Wrapper::CreateDebugLayer()
 {
 	ID3D12Debug* debug;
-	result = D3D12GetDebugInterface(IID_PPV_ARGS(&debug));
+	auto result = D3D12GetDebugInterface(IID_PPV_ARGS(&debug));
 	if (SUCCEEDED(result))
 	{
 		debug->EnableDebugLayer();
@@ -20,7 +22,7 @@ void Dx12Wrapper::CreateDebugLayer(HRESULT& result)
 	debug->Release();
 }
 
-void Dx12Wrapper::InitFeatureLevel(HRESULT& result)
+void Dx12Wrapper::InitFeatureLevel()
 {
 	D3D_FEATURE_LEVEL levels[] = {
 		D3D_FEATURE_LEVEL_12_1,
@@ -54,7 +56,7 @@ void Dx12Wrapper::InitFeatureLevel(HRESULT& result)
 	for (auto& l : levels)
 	{
 		// ディスプレイアダプターを表すデバイスの作成
-		result = D3D12CreateDevice(adapter, l, IID_PPV_ARGS(&dev));
+		auto result = D3D12CreateDevice(adapter, l, IID_PPV_ARGS(&dev));
 
 		if (SUCCEEDED(result))
 		{
@@ -63,7 +65,7 @@ void Dx12Wrapper::InitFeatureLevel(HRESULT& result)
 	}
 }
 
-void Dx12Wrapper::CreateSwapChain(HRESULT& result, HWND hwnd)
+void Dx12Wrapper::CreateSwapChain(HWND hwnd)
 {
 	// コマンドキューの作成
 	D3D12_COMMAND_QUEUE_DESC cmdQDesc = {};
@@ -71,7 +73,7 @@ void Dx12Wrapper::CreateSwapChain(HRESULT& result, HWND hwnd)
 	cmdQDesc.NodeMask = 0;
 	cmdQDesc.Priority = D3D12_COMMAND_QUEUE_PRIORITY_NORMAL;
 	cmdQDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
-	result = dev->CreateCommandQueue(&cmdQDesc, IID_PPV_ARGS(&cmdQueue));
+	auto result = dev->CreateCommandQueue(&cmdQDesc, IID_PPV_ARGS(&cmdQueue));
 
 	// スワップチェインの作成
 	auto wsize = Application::Instance().GetWindowSize();
@@ -91,7 +93,7 @@ void Dx12Wrapper::CreateSwapChain(HRESULT& result, HWND hwnd)
 		cmdQueue, hwnd, &swapChainDesc, nullptr, nullptr, (IDXGISwapChain1**)(&swapChain));
 }
 
-void Dx12Wrapper::CreateRenderTarget(HRESULT& result)
+void Dx12Wrapper::CreateRenderTarget()
 {
 	// レンダーターゲット作成のための前準備
 	// 表示画面用メモリ確保
@@ -100,7 +102,7 @@ void Dx12Wrapper::CreateRenderTarget(HRESULT& result)
 	descriptorHeapDesc.NodeMask = 0;
 	descriptorHeapDesc.NumDescriptors = 2;	// 表画面と裏画面
 	descriptorHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-	result = dev->CreateDescriptorHeap(&descriptorHeapDesc, IID_PPV_ARGS(&rtvDescriptorHeap));
+	auto result = dev->CreateDescriptorHeap(&descriptorHeapDesc, IID_PPV_ARGS(&rtvDescriptorHeap));
 
 
 	DXGI_SWAP_CHAIN_DESC swapCDesc = {};
@@ -119,9 +121,14 @@ void Dx12Wrapper::CreateRenderTarget(HRESULT& result)
 	}
 }
 
-void Dx12Wrapper::CreateVertexBuffer(HRESULT& result)
+void Dx12Wrapper::CreateVertexBuffer()
 {
-	DirectX::XMFLOAT3 vertices[] = { {-0.4f, -0.4f, 0.0f}, {-0.4f, 0.4f, 0.0f},  {0.4f, -0.4f, 0.0f}, {0.4f, 0.4f, 0.0f} };
+	Vertex vertices[] = {
+		DirectX::XMFLOAT3(-0.4f, -0.4f, 0.0f), DirectX::XMFLOAT2(0.0f, 0.0f),
+		DirectX::XMFLOAT3(-0.4f, 0.4f, 0.0f), DirectX::XMFLOAT2(0.0f, 1.0f),
+		DirectX::XMFLOAT3(0.4f, -0.4f, 0.0f), DirectX::XMFLOAT2(1.0f, 0.0f),
+		DirectX::XMFLOAT3(0.4f, 0.4f, 0.0f), DirectX::XMFLOAT2(1.0f, 1.0f),
+	};
 
 	D3D12_HEAP_PROPERTIES heapprop = {};
 	heapprop.Type = D3D12_HEAP_TYPE_UPLOAD;
@@ -140,7 +147,7 @@ void Dx12Wrapper::CreateVertexBuffer(HRESULT& result)
 	resdesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
 
 	// 頂点バッファの作成
-	result = dev->CreateCommittedResource(&heapprop, D3D12_HEAP_FLAG_NONE, &resdesc,
+	auto result = dev->CreateCommittedResource(&heapprop, D3D12_HEAP_FLAG_NONE, &resdesc,
 								D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&vertexBuffer));
 
 	std::vector<unsigned short> indices = { 0,1,2, 1,2,3 };	// 頂点を使用する順番
@@ -150,7 +157,7 @@ void Dx12Wrapper::CreateVertexBuffer(HRESULT& result)
 		D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&indexBuffer));
 
 	D3D12_RANGE range = { 0,0 };
-	DirectX::XMFLOAT3* vertexMap = nullptr;
+	Vertex* vertexMap = nullptr;
 	result = vertexBuffer->Map(0, nullptr, (void**)& vertexMap);
 	std::copy(std::begin(vertices), std::end(vertices), vertexMap);
 	vertexBuffer->Unmap(0, nullptr);
@@ -165,19 +172,15 @@ void Dx12Wrapper::CreateVertexBuffer(HRESULT& result)
 }
 
 
-void Dx12Wrapper::InitShader(HRESULT& result)
+void Dx12Wrapper::InitShader()
 {
-	result = D3DCompileFromFile(L"Shader.hlsl", nullptr, nullptr, "vs", "vs_5_0",
+	auto result = D3DCompileFromFile(L"Shader.hlsl", nullptr, nullptr, "vs", "vs_5_0",
 						D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION, 0, &vertexShader, nullptr);
 	result = D3DCompileFromFile(L"Shader.hlsl", nullptr, nullptr, "ps", "ps_5_0",
 						D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION, 0, &pixelShader, nullptr);
 
-	D3D12_ROOT_PARAMETER rootParam = {};
-	rootParam.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-	rootParam.DescriptorTable.NumDescriptorRanges = 1;
-
-	InitRootSignatur(result);
-	InitPipelineState(result);
+	InitRootSignatur();
+	InitPipelineState();
 
 	auto wsize = Application::Instance().GetWindowSize();
 	// ビューポート設定
@@ -195,26 +198,62 @@ void Dx12Wrapper::InitShader(HRESULT& result)
 	scissorRect.bottom = wsize.height;
 }
 
-void Dx12Wrapper::InitRootSignatur(HRESULT& result)
+void Dx12Wrapper::InitRootSignatur()
 {
-	ID3DBlob* signature = nullptr;		// ルートシグネチャをつくるための材料
-	ID3DBlob* error = nullptr;			// エラー出た時の対処
+	D3D12_DESCRIPTOR_RANGE descRange = {};
+	// ここから"t0"を流してる
+	descRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+	descRange.BaseShaderRegister = 0;		// ﾚｼﾞｽﾀ番号
+	descRange.NumDescriptors = 1;			// 1回で読む数
+	descRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
+	D3D12_ROOT_PARAMETER rootParam = {};
+	rootParam.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+	rootParam.DescriptorTable.NumDescriptorRanges = 1;
+	rootParam.DescriptorTable.pDescriptorRanges = &descRange;	// 対応するレンジへのポインタ
+	rootParam.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+
+
+	// サンプラの設定
+	D3D12_STATIC_SAMPLER_DESC samplerDesc = {};
+	samplerDesc.Filter = D3D12_FILTER_MIN_MAG_LINEAR_MIP_POINT;	// 特別なフィルタを使用しない
+	samplerDesc.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;		// 絵が繰り返される(U方向)
+	samplerDesc.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;		// 絵が繰り返される(V方向)
+	samplerDesc.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;		// 絵が繰り返される(W方向)
+	samplerDesc.MaxLOD = D3D12_FLOAT32_MAX;		// MIPMAP上限なし
+	samplerDesc.MinLOD = 0.0f;					// MIPMAP下限なし
+	samplerDesc.BorderColor = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;	// エッジのいろ(黒透明)
+	samplerDesc.ShaderRegister = 0;				// 使用するシェーダレジスタ(スロット)
+	samplerDesc.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;	// 全部のデータをシェーダに見せる
+	samplerDesc.RegisterSpace = 0;
+	samplerDesc.MaxAnisotropy = 0;
+	samplerDesc.ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
 
 	D3D12_ROOT_SIGNATURE_DESC rsd = {};
 	rsd.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
+	rsd.NumParameters = 1;
+	rsd.NumStaticSamplers = 1;
+	rsd.pParameters = &rootParam;
+	rsd.pStaticSamplers = &samplerDesc;
 
-	result = D3D12SerializeRootSignature(&rsd, D3D_ROOT_SIGNATURE_VERSION_1, &signature, &error);
+	ID3DBlob* signature = nullptr;		// ルートシグネチャをつくるための材料
+	ID3DBlob* error = nullptr;			// エラー出た時の対処
+	auto result = D3D12SerializeRootSignature(&rsd, D3D_ROOT_SIGNATURE_VERSION_1, &signature, &error);
 
 	// ルートシグネチャの作成
 	result = dev->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(),
 																				IID_PPV_ARGS(&rootSignature));
 }
 
-void Dx12Wrapper::InitPipelineState(HRESULT& result)
+void Dx12Wrapper::InitPipelineState()
 {
 	// 頂点レイアウト
-	D3D12_INPUT_ELEMENT_DESC layouts[] = { {"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT,
-														D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0} };
+	D3D12_INPUT_ELEMENT_DESC layouts[] = { 
+		{"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, 
+												D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+		{"TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT,
+												D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0}
+	};
 
 	// パイプラインステートを作る
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC gpsDesc = {};
@@ -251,7 +290,44 @@ void Dx12Wrapper::InitPipelineState(HRESULT& result)
 	gpsDesc.SampleMask = 0xffffffff;	// 全部1
 	gpsDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;	// 三角形
 
-	result = dev->CreateGraphicsPipelineState(&gpsDesc, IID_PPV_ARGS(&pipelineState));
+	auto result = dev->CreateGraphicsPipelineState(&gpsDesc, IID_PPV_ARGS(&pipelineState));
+}
+
+ID3D12Resource* Dx12Wrapper::CreateTextureResource(ID3D12Resource* buff, const unsigned int width, const unsigned int height, const unsigned int arraySize)
+{
+	D3D12_HEAP_PROPERTIES heapprop = {};
+	heapprop.Type = D3D12_HEAP_TYPE_CUSTOM;
+	heapprop.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_WRITE_BACK;
+	heapprop.MemoryPoolPreference = D3D12_MEMORY_POOL_L0;
+	heapprop.CreationNodeMask = 1;
+	heapprop.VisibleNodeMask = 1;
+
+	D3D12_RESOURCE_DESC resDesc = {};
+	resDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+	resDesc.Alignment = 0;
+	resDesc.Width = width;
+	resDesc.Height = height;
+	resDesc.DepthOrArraySize = arraySize;
+	resDesc.MipLevels = 0;
+	resDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+	resDesc.SampleDesc.Count = 1;
+	resDesc.SampleDesc.Quality = 0;
+	resDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+	resDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+
+	auto result = dev->CreateCommittedResource(
+		&heapprop,
+		D3D12_HEAP_FLAG_NONE,
+		&resDesc,
+		D3D12_RESOURCE_STATE_COPY_DEST,
+		nullptr,
+		IID_PPV_ARGS(&buff));
+
+	if (result == S_OK)
+	{
+		return buff;
+	}
+	return nullptr;
 }
 
 void Dx12Wrapper::ClearCmd(ID3D12PipelineState* pipelinestate, ID3D12RootSignature* rootsignature)
@@ -296,20 +372,63 @@ void Dx12Wrapper::WaitExecute()
 	}
 }
 
+void Dx12Wrapper::CreateTex()
+{
+	DirectX::TexMetadata metadata;
+	DirectX::ScratchImage img;
+	// 画像読み込み
+	auto result = LoadFromWICFile(L"img/kaho.png", DirectX::WIC_FLAGS_NONE, &metadata, img);
+	texBuff = CreateTextureResource(texBuff, metadata.width, metadata.height, metadata.arraySize);
+
+	D3D12_RESOURCE_DESC resdesc = {};
+	resdesc = texBuff->GetDesc();
+
+	D3D12_BOX box;
+	box.left = 0;
+	box.right = resdesc.Width;
+	box.top = 0;
+	box.bottom = resdesc.Height;
+	box.front = 0;
+	box.back = 1;
+
+	// ﾃｸｽﾁｬ書き込み
+	result = texBuff->WriteToSubresource(
+		0,
+		&box,
+		img.GetPixels(),
+		metadata.width * 4,
+		img.GetPixelsSize());
+
+	// ﾋｰﾌﾟの設定
+	D3D12_DESCRIPTOR_HEAP_DESC descHeapDesc = {};
+	descHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+	descHeapDesc.NodeMask = 0;
+	descHeapDesc.NumDescriptors = 1;
+	descHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+
+	// ﾋｰﾌﾟ作成
+	result = dev->CreateDescriptorHeap(&descHeapDesc, IID_PPV_ARGS(&texHeap));
+
+	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+	srvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+	srvDesc.Texture2D.MipLevels = 1;
+	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	dev->CreateShaderResourceView(texBuff, &srvDesc, texHeap->GetCPUDescriptorHandleForHeapStart());
+}
+
 Dx12Wrapper::Dx12Wrapper(HWND hwnd)
 {
-	HRESULT result = S_OK;
-
 #ifdef _DEBUG
-	CreateDebugLayer(result);
+	CreateDebugLayer();
 #endif // _DEBUG
 
 	// DXGIファクトリの作成
-	result = CreateDXGIFactory1(IID_PPV_ARGS(&dxgiFactory));
+	auto result = CreateDXGIFactory1(IID_PPV_ARGS(&dxgiFactory));
 
-	InitFeatureLevel(result);
-	CreateSwapChain(result, hwnd);
-	CreateRenderTarget(result);
+	InitFeatureLevel();
+	CreateSwapChain(hwnd);
+	CreateRenderTarget();
 	
 	// ｺﾏﾝﾄﾞｱﾛｹｰﾀとｺﾏﾝﾄﾞﾘｽﾄの生成
 	result = dev->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&cmdAllocator));
@@ -317,9 +436,11 @@ Dx12Wrapper::Dx12Wrapper(HWND hwnd)
 	// フェンスの作成
 	result = dev->CreateFence(fenceValue, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence));
 
-	CreateVertexBuffer(result);
+	CreateVertexBuffer();
 
-	InitShader(result);
+	InitShader();
+
+	CreateTex();
 
 	cmdList->Close();
 }
@@ -346,6 +467,9 @@ Dx12Wrapper::~Dx12Wrapper()
 	{
 		backBuffer->Release();
 	}
+
+	texBuff->Release();
+	texHeap->Release();
 }
 
 void Dx12Wrapper::Update()
@@ -373,6 +497,9 @@ void Dx12Wrapper::Draw()
 
 	// 画面のクリア(これも書き込みに入る)
 	cmdList->ClearRenderTargetView(heapStart, clearColor, 0, nullptr);	// クリア
+
+	//cmdList->SetDescriptorHeaps(1, &texHeap);
+	//cmdList->SetGraphicsRootDescriptorTable(0, texHeap->GetGPUDescriptorHandleForHeapStart());
 
 	cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
 	cmdList->IASetVertexBuffers(0, 1, &vbView);
