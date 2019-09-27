@@ -124,10 +124,10 @@ void Dx12Wrapper::CreateRenderTarget()
 void Dx12Wrapper::CreateVertexBuffer()
 {
 	Vertex vertices[] = {
-		DirectX::XMFLOAT3(-0.4f, -0.4f, 0.0f), DirectX::XMFLOAT2(0.0f, 0.0f),
-		DirectX::XMFLOAT3(-0.4f, 0.4f, 0.0f), DirectX::XMFLOAT2(0.0f, 1.0f),
-		DirectX::XMFLOAT3(0.4f, -0.4f, 0.0f), DirectX::XMFLOAT2(1.0f, 0.0f),
-		DirectX::XMFLOAT3(0.4f, 0.4f, 0.0f), DirectX::XMFLOAT2(1.0f, 1.0f),
+		DirectX::XMFLOAT3(-0.8f, -0.8f, 0.0f), DirectX::XMFLOAT2(0.0f, 1.0f),	// 左下
+		DirectX::XMFLOAT3(-0.8f, 0.8f, 0.0f), DirectX::XMFLOAT2(0.0f, 0.0f),	// 左上
+		DirectX::XMFLOAT3(0.8f, -0.8f, 0.0f), DirectX::XMFLOAT2(1.0f, 1.0f),	// 右上
+		DirectX::XMFLOAT3(0.8f, 0.8f, 0.0f), DirectX::XMFLOAT2(1.0f, 0.0f),		// 右下
 	};
 
 	D3D12_HEAP_PROPERTIES heapprop = {};
@@ -200,17 +200,22 @@ void Dx12Wrapper::InitShader()
 
 void Dx12Wrapper::InitRootSignatur()
 {
-	D3D12_DESCRIPTOR_RANGE descRange = {};
+	D3D12_DESCRIPTOR_RANGE descRange[2] = {};
 	// ここから"t0"を流してる
-	descRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-	descRange.BaseShaderRegister = 0;		// ﾚｼﾞｽﾀ番号
-	descRange.NumDescriptors = 1;			// 1回で読む数
-	descRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+	descRange[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+	descRange[0].BaseShaderRegister = 0;		// ﾚｼﾞｽﾀ番号
+	descRange[0].NumDescriptors = 1;			// 1回で読む数
+	descRange[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
+	descRange[1].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
+	descRange[1].BaseShaderRegister = 1;		// ﾚｼﾞｽﾀ番号
+	descRange[1].NumDescriptors = 1;			// 1回で読む数
+	descRange[1].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
 	D3D12_ROOT_PARAMETER rootParam = {};
 	rootParam.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-	rootParam.DescriptorTable.NumDescriptorRanges = 1;
-	rootParam.DescriptorTable.pDescriptorRanges = &descRange;	// 対応するレンジへのポインタ
+	rootParam.DescriptorTable.NumDescriptorRanges = 2;		// レンジの数
+	rootParam.DescriptorTable.pDescriptorRanges = &descRange[0];	// 対応するレンジへのポインタ
 	rootParam.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
 
@@ -241,8 +246,7 @@ void Dx12Wrapper::InitRootSignatur()
 	auto result = D3D12SerializeRootSignature(&rsd, D3D_ROOT_SIGNATURE_VERSION_1, &signature, &error);
 
 	// ルートシグネチャの作成
-	result = dev->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(),
-																				IID_PPV_ARGS(&rootSignature));
+	result = dev->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&rootSignature));
 }
 
 void Dx12Wrapper::InitPipelineState()
@@ -374,10 +378,13 @@ void Dx12Wrapper::WaitExecute()
 
 void Dx12Wrapper::CreateTex()
 {
+	auto result = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+
 	DirectX::TexMetadata metadata;
 	DirectX::ScratchImage img;
 	// 画像読み込み
-	auto result = LoadFromWICFile(L"img/kaho.png", DirectX::WIC_FLAGS_NONE, &metadata, img);
+	//result = LoadFromWICFile(L"img/masaki.png", DirectX::WIC_FLAGS_NONE, &metadata, img);
+	result = LoadFromWICFile(L"img/kaho.png", DirectX::WIC_FLAGS_NONE, &metadata, img);
 	texBuff = CreateTextureResource(texBuff, metadata.width, metadata.height, metadata.arraySize);
 
 	D3D12_RESOURCE_DESC resdesc = {};
@@ -403,7 +410,7 @@ void Dx12Wrapper::CreateTex()
 	D3D12_DESCRIPTOR_HEAP_DESC descHeapDesc = {};
 	descHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 	descHeapDesc.NodeMask = 0;
-	descHeapDesc.NumDescriptors = 1;
+	descHeapDesc.NumDescriptors = 2;
 	descHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 
 	// ﾋｰﾌﾟ作成
@@ -415,6 +422,32 @@ void Dx12Wrapper::CreateTex()
 	srvDesc.Texture2D.MipLevels = 1;
 	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 	dev->CreateShaderResourceView(texBuff, &srvDesc, texHeap->GetCPUDescriptorHandleForHeapStart());
+	auto h = texHeap->GetCPUDescriptorHandleForHeapStart();
+	h.ptr += dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+}
+
+void Dx12Wrapper::InitConstants()
+{
+	D3D12_HEAP_PROPERTIES cbvHeapProp = {};
+	cbvHeapProp.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+	cbvHeapProp.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+	cbvHeapProp.CreationNodeMask = 1;
+	cbvHeapProp.VisibleNodeMask = 1;
+	cbvHeapProp.Type = D3D12_HEAP_TYPE_UPLOAD;
+
+	size_t size = sizeof(Vertex);
+	size = (size + 0xff) & ~0xff;		// 256ｱﾗｲﾒﾝﾄに合わせている
+
+	auto result = dev->CreateCommittedResource(&cbvHeapProp, D3D12_HEAP_FLAGS::D3D12_HEAP_FLAG_NONE,
+		&CD3DX12_RESOURCE_DESC::Buffer(4 * size),
+		D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&constBuff));
+
+	auto handle = texHeap->GetCPUDescriptorHandleForHeapStart();
+	handle.ptr += dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
+	cbvDesc.BufferLocation = constBuff->GetGPUVirtualAddress();
+	cbvDesc.SizeInBytes = size;
+	dev->CreateConstantBufferView(&cbvDesc, handle);
 }
 
 Dx12Wrapper::Dx12Wrapper(HWND hwnd)
@@ -441,6 +474,8 @@ Dx12Wrapper::Dx12Wrapper(HWND hwnd)
 	InitShader();
 
 	CreateTex();
+
+	InitConstants();
 
 	cmdList->Close();
 }
@@ -470,6 +505,7 @@ Dx12Wrapper::~Dx12Wrapper()
 
 	texBuff->Release();
 	texHeap->Release();
+	constBuff->Release();
 }
 
 void Dx12Wrapper::Update()
@@ -498,8 +534,8 @@ void Dx12Wrapper::Draw()
 	// 画面のクリア(これも書き込みに入る)
 	cmdList->ClearRenderTargetView(heapStart, clearColor, 0, nullptr);	// クリア
 
-	//cmdList->SetDescriptorHeaps(1, &texHeap);
-	//cmdList->SetGraphicsRootDescriptorTable(0, texHeap->GetGPUDescriptorHandleForHeapStart());
+	cmdList->SetDescriptorHeaps(1, &texHeap);
+	cmdList->SetGraphicsRootDescriptorTable(0, texHeap->GetGPUDescriptorHandleForHeapStart());
 
 	cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
 	cmdList->IASetVertexBuffers(0, 1, &vbView);

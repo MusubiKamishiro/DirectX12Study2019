@@ -17,6 +17,15 @@ struct Vertex {
 	DirectX::XMFLOAT2 uv;	// UV座標
 };
 
+struct WVP {
+	DirectX::XMMATRIX world;		// ﾜｰﾙﾄﾞ
+	DirectX::XMMATRIX viewProj;		// ﾋﾞｭｰﾌﾟﾛｼﾞｪｸｼｮﾝ
+	DirectX::XMMATRIX wvp;			// 合成済み
+	DirectX::XMMATRIX lightVP;		// ﾗｲﾄﾋﾞｭｰﾌﾟﾛｼﾞｪｸｼｮﾝ
+	DirectX::XMFLOAT4 eye;			// 視点
+};
+
+
 class Dx12Wrapper
 {
 private:
@@ -62,6 +71,11 @@ private:
 	ID3D12Resource* CreateTextureResource(ID3D12Resource* buff, const unsigned int width = 4,
 												const unsigned int height = 4, const unsigned int arraySize = 1);
 
+	void InitConstants();	// 定数バッファの初期化
+	ID3D12Resource* constBuff = nullptr;	// 定数バッファ
+	WVP* m = nullptr;
+	WVP mappedMatrix;
+
 	// 命令のクリア
 	void ClearCmd(ID3D12PipelineState* pipelinestate, ID3D12RootSignature* rootsignature);
 
@@ -92,7 +106,8 @@ private:
 	///確認が終わり次第削除すること
 	ID3D12Resource* texBuff = nullptr;
 	ID3D12DescriptorHeap* texHeap = nullptr;
-	void CreateTex();
+	void CreateTex();	// テクスチャ画像の作成
+
 
 public:
 	Dx12Wrapper(HWND hwnd);

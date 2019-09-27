@@ -2,6 +2,15 @@
 Texture2D<float4> tex	: register(t0);
 // ｻﾝﾌﾟﾗ(0)
 SamplerState smp : register(s0);
+// 定数バッファ
+cbuffer mat : register(b0)
+{
+	matrix world;		// ﾜｰﾙﾄﾞ
+	matrix viewProj;	// ﾋﾞｭｰﾌﾟﾛｼﾞｪｸｼｮﾝ
+	matrix wvp;			// 合成済み
+	matrix lightVP;		// ﾗｲﾄﾋﾞｭｰﾌﾟﾛｼﾞｪｸｼｮﾝ
+	float4 eye;			// 視点
+};
 
 struct Output
 {
@@ -25,7 +34,6 @@ Output vs(float4 pos : POSITION, float2 uv : TEXCOORD)
 // ピクセルシェーダ
 float4 ps(Output output) : SV_TARGET
 {
-	//return float4(0, (output.pos.xy + float2(1, 1)) / 2, 1);
-	return float4(1.0f, float2(output.uv), 1.0f);
-	//return float4(tex.Sample(smp, output.uv).rgb, 1.0f)
+	//return float4(1.0f, float2(output.uv), 1.0f);
+	return float4(tex.Sample(smp, output.uv).rgb, 1.0f);
 }
