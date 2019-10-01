@@ -22,7 +22,6 @@ struct WVP {
 	DirectX::XMMATRIX viewProj;		// ËŞ­°ÌßÛ¼Şª¸¼®İ
 	DirectX::XMMATRIX wvp;			// ‡¬Ï‚İ
 	DirectX::XMMATRIX lightVP;		// ×²ÄËŞ­°ÌßÛ¼Şª¸¼®İ
-	DirectX::XMFLOAT4 eye;			// ‹“_
 };
 
 

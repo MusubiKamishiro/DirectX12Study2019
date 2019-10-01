@@ -208,7 +208,7 @@ void Dx12Wrapper::InitRootSignatur()
 	descRange[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
 	descRange[1].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
-	descRange[1].BaseShaderRegister = 1;		// ﾚｼﾞｽﾀ番号
+	descRange[1].BaseShaderRegister = 0;		// ﾚｼﾞｽﾀ番号
 	descRange[1].NumDescriptors = 1;			// 1回で読む数
 	descRange[1].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
@@ -422,28 +422,52 @@ void Dx12Wrapper::CreateTex()
 	srvDesc.Texture2D.MipLevels = 1;
 	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 	dev->CreateShaderResourceView(texBuff, &srvDesc, texHeap->GetCPUDescriptorHandleForHeapStart());
-	auto h = texHeap->GetCPUDescriptorHandleForHeapStart();
-	h.ptr += dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 }
 
 void Dx12Wrapper::InitConstants()
 {
-	D3D12_HEAP_PROPERTIES cbvHeapProp = {};
-	cbvHeapProp.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-	cbvHeapProp.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-	cbvHeapProp.CreationNodeMask = 1;
-	cbvHeapProp.VisibleNodeMask = 1;
-	cbvHeapProp.Type = D3D12_HEAP_TYPE_UPLOAD;
+	auto wsize = Application::Instance().GetWindowSize();	// 画面サイズ
 
-	size_t size = sizeof(Vertex);
-	size = (size + 0xff) & ~0xff;		// 256ｱﾗｲﾒﾝﾄに合わせている
+	DirectX::XMMATRIX world = DirectX::XMMatrixIdentity();
+	mappedMatrix.world = world;
 
-	auto result = dev->CreateCommittedResource(&cbvHeapProp, D3D12_HEAP_FLAGS::D3D12_HEAP_FLAG_NONE,
-		&CD3DX12_RESOURCE_DESC::Buffer(4 * size),
-		D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&constBuff));
+	// ｶﾒﾗの設定
+	auto eyePos = DirectX::XMFLOAT3(0, 20, -15);	// カメラの位置(視点)
+	auto focusPos = DirectX::XMFLOAT3(0, 10, 0);	// 焦点の位置(注視点)
+	auto up = DirectX::XMFLOAT3(0.0f, 1.0f, 0.0f);	// カメラの上方向(通常は(0.0f, 1.0f, 0.0f))	// カメラを固定するためのもの
+
+	DirectX::XMMATRIX camera = DirectX::XMMatrixLookAtLH(XMLoadFloat3(&eyePos), XMLoadFloat3(&focusPos), XMLoadFloat3(&up));	// カメラ行列
+													// XMLoadFloat3...XMFloat3をXMVECTORに変換する
+
+	auto aspect = (float)wsize.width / (float)wsize.height;		// ビュー空間の高さと幅のアスペクト比
+	DirectX::XMMATRIX projection = DirectX::XMMatrixPerspectiveFovLH(3.1415f / 2.0f, aspect, 0.5f, 300.0f);		// 射影行列	// LH...LeftHandの略,RHもあるよ
+	DirectX::XMMATRIX lightProj = DirectX::XMMatrixOrthographicLH(30, 30, 0.5f, 300.0f);
+
+	mappedMatrix.viewProj = camera * projection;		// かける順番には気を付けよう
+	mappedMatrix.wvp = world * camera * projection;
+
+	auto lightPos = DirectX::XMFLOAT3(50, 70, -15);
+	DirectX::XMMATRIX _lcamera = DirectX::XMMatrixLookAtLH(XMLoadFloat3(&lightPos), XMLoadFloat3(&focusPos), XMLoadFloat3(&up));
+	mappedMatrix.lightVP = _lcamera * lightProj;
+
+	size_t size = sizeof(mappedMatrix);
+	size = (size + 0xff) & ~0xff;		// 256アライメントに合わせている
+
+	auto result = dev->CreateCommittedResource(
+		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+		D3D12_HEAP_FLAGS::D3D12_HEAP_FLAG_NONE,
+		&CD3DX12_RESOURCE_DESC::Buffer(size),
+		D3D12_RESOURCE_STATE_GENERIC_READ,
+		nullptr,
+		IID_PPV_ARGS(&constBuff));
+
+	result = constBuff->Map(0, nullptr, (void**)&m);	// シェーダに送る
+	*m = mappedMatrix;
+
 
 	auto handle = texHeap->GetCPUDescriptorHandleForHeapStart();
 	handle.ptr += dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
 	D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
 	cbvDesc.BufferLocation = constBuff->GetGPUVirtualAddress();
 	cbvDesc.SizeInBytes = size;
@@ -510,7 +534,53 @@ Dx12Wrapper::~Dx12Wrapper()
 
 void Dx12Wrapper::Update()
 {
+	// 入力関連
+	unsigned char keyState[256] = {};
 
+	Vector3 pos = {};
+	Vector3 angle = {};
+
+	if (GetKeyboardState(keyState))
+	{
+		// 平行移動
+		if (keyState[VK_UP] & 0x80)	// 0b00000000
+		{
+			pos.y = 0.05f;
+		}
+		if (keyState[VK_DOWN] & 0x80)
+		{
+			pos.y = -0.05f;
+		}
+		if (keyState[VK_RIGHT] & 0x80)
+		{
+			pos.x = 0.05f;
+		}
+		if (keyState[VK_LEFT] & 0x80)
+		{
+			pos.x = -0.05f;
+		}
+
+		// 回転
+		if (keyState['A'] & 0x80)
+		{
+			angle.x = 0.01f;
+		}
+		if (keyState['D'] & 0x80)
+		{
+			angle.x = -0.01f;
+		}
+		if (keyState['W'] & 0x80)
+		{
+			angle.y = 0.01f;
+		}
+		if (keyState['S'] & 0x80)
+		{
+			angle.y = -0.01f;
+		}
+	}
+	m->world *= DirectX::XMMatrixTranslation(pos.x, pos.y, pos.z);
+	m->world *= DirectX::XMMatrixRotationY(angle.x);	// 回転
+	m->world *= DirectX::XMMatrixRotationX(angle.y);
 }
 
 void Dx12Wrapper::Draw()

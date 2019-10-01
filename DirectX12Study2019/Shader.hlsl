@@ -9,7 +9,6 @@ cbuffer mat : register(b0)
 	matrix viewProj;	// ËŞ­°ÌßÛ¼Şª¸¼®İ
 	matrix wvp;			// ‡¬Ï‚İ
 	matrix lightVP;		// ×²ÄËŞ­°ÌßÛ¼Şª¸¼®İ
-	float4 eye;			// ‹“_
 };
 
 struct Output
@@ -23,8 +22,10 @@ struct Output
 Output vs(float4 pos : POSITION, float2 uv : TEXCOORD)
 {
 	Output output;
-	output.pos = pos;
-	output.svpos = pos;
+	//output.pos = pos;
+	output.pos = mul(world, pos);
+	//output.svpos = pos;
+	output.svpos = mul(mul(viewProj, world), pos);	// 2ŸŒ³ã
 	output.uv = uv;
 
 	return output;
