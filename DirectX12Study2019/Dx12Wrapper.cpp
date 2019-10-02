@@ -292,7 +292,8 @@ void Dx12Wrapper::InitPipelineState()
 	gpsDesc.SampleDesc.Count = 1;		// いる
 	gpsDesc.SampleDesc.Quality = 0;		// いる
 	gpsDesc.SampleMask = 0xffffffff;	// 全部1
-	gpsDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;	// 三角形
+	//gpsDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;	// 三角形
+	gpsDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_POINT;	// 点
 
 	auto result = dev->CreateGraphicsPipelineState(&gpsDesc, IID_PPV_ARGS(&pipelineState));
 }
@@ -424,6 +425,89 @@ void Dx12Wrapper::CreateTex()
 	dev->CreateShaderResourceView(texBuff, &srvDesc, texHeap->GetCPUDescriptorHandleForHeapStart());
 }
 
+void Dx12Wrapper::Pmd()
+{
+	// モデルの読み込み
+	FILE* fp;
+	errno_t error;
+	error = fopen_s(&fp, "model/miku/初音ミク.pmd", "rb");	
+
+	assert(error == 0);	// 読み込めなかった場合警告を吐く
+	
+	// ヘッダ読み込み
+	PMD pmdData;
+	fread(&pmdData.magic, sizeof(pmdData.magic), 1, fp);
+	fread(&pmdData.version, sizeof(pmdData.version), 1, fp);
+	fread(&pmdData.model_name, sizeof(pmdData.model_name), 1, fp);
+	fread(&pmdData.comment, sizeof(pmdData.comment), 1, fp);
+
+	// 頂点数読み込み
+	unsigned int vertexCount;
+	fread(&vertexCount, sizeof(vertexCount), 1, fp);
+	// 頂点の数だけ頂点リスト読み込み
+	pmdVertexDatas.resize(vertexCount);
+	for (int i = 0; i < pmdVertexDatas.size(); ++i)
+	{
+		fread(&pmdVertexDatas[i].pos,			sizeof(pmdVertexDatas[i].pos),			1, fp);
+		fread(&pmdVertexDatas[i].normal_vec,	sizeof(pmdVertexDatas[i].normal_vec),	1, fp);
+		fread(&pmdVertexDatas[i].uv,			sizeof(pmdVertexDatas[i].uv),			1, fp);
+		fread(&pmdVertexDatas[i].bone_num,		sizeof(pmdVertexDatas[i].bone_num),		1, fp);
+		fread(&pmdVertexDatas[i].bone_weight,	sizeof(pmdVertexDatas[i].bone_weight),	1, fp);
+		fread(&pmdVertexDatas[i].edge_flag,		sizeof(pmdVertexDatas[i].edge_flag),	1, fp);
+	}
+
+	// 面頂点数読み込み
+	unsigned int faceVertexCount;
+	fread(&faceVertexCount, sizeof(faceVertexCount), 1, fp);
+	// 面頂点リスト読み込み
+	pmdFaceVertices.resize(faceVertexCount);
+	fread(pmdFaceVertices.data(), pmdFaceVertices.size() * sizeof(unsigned short), 1, fp);
+
+
+}
+
+void Dx12Wrapper::CreatePmdVertexBuffer()
+{
+	D3D12_HEAP_PROPERTIES heapprop = {};
+	heapprop.Type = D3D12_HEAP_TYPE_UPLOAD;
+	heapprop.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+	heapprop.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+
+	D3D12_RESOURCE_DESC resdesc = {};
+	resdesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+	resdesc.Width = (sizeof(pmdVertexDatas[0]) * pmdVertexDatas.size());	// 頂点情報が入るだけのサイズ
+	resdesc.Height = 1;
+	resdesc.DepthOrArraySize = 1;
+	resdesc.MipLevels = 1;
+	resdesc.Format = DXGI_FORMAT_UNKNOWN;
+	resdesc.SampleDesc.Count = 1;
+	resdesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+	resdesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+
+	// 頂点バッファの作成
+	auto result = dev->CreateCommittedResource(&heapprop, D3D12_HEAP_FLAG_NONE, &resdesc,
+		D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&pmdVertexBuffer));
+
+	// インデックスバッファの作成
+	result = dev->CreateCommittedResource(&heapprop, D3D12_HEAP_FLAG_NONE,
+		&CD3DX12_RESOURCE_DESC::Buffer(pmdVertexDatas.size()),
+		D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&pmdIndexBuffer));
+
+	D3D12_RANGE range = { 0,0 };
+	VertexData* vertexMap = nullptr;
+	result = pmdVertexBuffer->Map(0, nullptr, (void**)&vertexMap);
+	std::copy(pmdVertexDatas.begin(), pmdVertexDatas.end(), vertexMap);
+	pmdVertexBuffer->Unmap(0, nullptr);
+
+	pmdVbView.BufferLocation = pmdVertexBuffer->GetGPUVirtualAddress();
+	pmdVbView.StrideInBytes = sizeof(pmdVertexDatas[0]);	// 頂点1つあたりのバイト数
+	pmdVbView.SizeInBytes = pmdVertexDatas.size();			// データ全体のサイズ
+
+	pmdIbView.BufferLocation = pmdIndexBuffer->GetGPUVirtualAddress();	// バッファの場所
+	pmdIbView.Format = DXGI_FORMAT_R16_UINT;	// フォーマット(shortなのでR16)
+	pmdIbView.SizeInBytes = pmdFaceVertices.size() * sizeof(pmdFaceVertices[0]);		// 総サイズ
+}
+
 void Dx12Wrapper::InitConstants()
 {
 	auto wsize = Application::Instance().GetWindowSize();	// 画面サイズ
@@ -492,6 +576,9 @@ Dx12Wrapper::Dx12Wrapper(HWND hwnd)
 	result = dev->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, cmdAllocator, nullptr, IID_PPV_ARGS(&cmdList));
 	// フェンスの作成
 	result = dev->CreateFence(fenceValue, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence));
+
+	Pmd();
+	CreatePmdVertexBuffer();
 
 	CreateVertexBuffer();
 
@@ -595,7 +682,7 @@ void Dx12Wrapper::Draw()
 	auto heapStart = rtvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
 	bbIdx = swapChain->GetCurrentBackBufferIndex();		// ﾊﾞｯｸﾊﾞｯﾌｧｲﾝﾃﾞｯｽｸを調べる
 	heapStart.ptr += bbIdx * dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-	float clearColor[] = { 0.0f, 1.0f, 0.0f, 1.0f };				// クリアカラー設定
+	float clearColor[] = { 1.0f, 1.0f, 1.0f, 1.0f };				// クリアカラー設定
 	cmdList->OMSetRenderTargets(1, &heapStart, false, nullptr);		// レンダーターゲット設定
 
 	// バリアの解除(ここから書き込みが始まる)
@@ -607,11 +694,15 @@ void Dx12Wrapper::Draw()
 	cmdList->SetDescriptorHeaps(1, &texHeap);
 	cmdList->SetGraphicsRootDescriptorTable(0, texHeap->GetGPUDescriptorHandleForHeapStart());
 
-	cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
-	cmdList->IASetVertexBuffers(0, 1, &vbView);
+	cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_POINTLIST);
+	//cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	//cmdList->IASetVertexBuffers(0, 1, &vbView);
 	cmdList->IASetIndexBuffer(&ibView);
+	cmdList->IASetVertexBuffers(0, 1, &pmdVbView);
+	//cmdList->IASetIndexBuffer(&pmdIbView);
 
-	cmdList->DrawInstanced(4, 2, 0, 0);
+	//cmdList->DrawInstanced(4, 2, 0, 0);
+	cmdList->DrawInstanced(pmdVertexDatas.size(), 1, 0, 0);
 
 	// バリアのセット
 	SetBarrier();

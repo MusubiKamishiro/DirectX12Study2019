@@ -5,7 +5,25 @@
 
 #include <vector>
 
+// PMDのヘッダファイル
+struct PMD
+{
+	char magic[3];			// "Pmd"
+	float version;			// バージョン
+	char model_name[20];	// モデルの名前
+	char comment[256];		// 製作者コメント
+};
 
+// 頂点データ
+struct VertexData
+{
+	float pos[3];					// x, y, z					// 座標
+	float normal_vec[3];			// nx, ny, nz				// 法線ベクトル
+	float uv[2];					// u, v						// UV座標			// MMDは頂点UV
+	unsigned short bone_num[2];		// ボーン番号1、番号2		// モデル変形(頂点移動)時に影響
+	unsigned char bone_weight;		// ボーン1に与える影響度	// min:0 max:100	// ボーン2への影響度は、(100 - bone_weight)
+	unsigned char edge_flag;		// 0:通常、1:エッジ無効		// エッジ(輪郭)が有効の場合
+};
 
 struct Vector3
 {
@@ -106,6 +124,17 @@ private:
 	ID3D12Resource* texBuff = nullptr;
 	ID3D12DescriptorHeap* texHeap = nullptr;
 	void CreateTex();	// テクスチャ画像の作成
+
+	// PMD関連
+	void Pmd();
+	std::vector<VertexData> pmdVertexDatas;	// PMD頂点データ
+	std::vector<unsigned short> pmdFaceVertices;	// PMD面頂点データ
+	// 頂点バッファの作成
+	void CreatePmdVertexBuffer();
+	ID3D12Resource* pmdVertexBuffer = nullptr;	// PMD用頂点バッファ
+	ID3D12Resource* pmdIndexBuffer = nullptr;	// PMD用インデックスバッファ
+	D3D12_VERTEX_BUFFER_VIEW pmdVbView = {};	// PMD用頂点バッファビュー
+	D3D12_INDEX_BUFFER_VIEW pmdIbView = {};		// PMD用インデックスバッファビュー
 
 
 public:
