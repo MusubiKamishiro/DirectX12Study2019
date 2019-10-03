@@ -255,8 +255,10 @@ void Dx12Wrapper::InitPipelineState()
 	D3D12_INPUT_ELEMENT_DESC layouts[] = { 
 		{"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, 
 												D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+		{"NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT,
+												D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
 		{"TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT,
-												D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0}
+												D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
 	};
 
 	// パイプラインステートを作る
@@ -276,11 +278,11 @@ void Dx12Wrapper::InitPipelineState()
 	gpsDesc.NumRenderTargets = 1;							// 一致させておく
 
 	// 深度ステンシル
-	gpsDesc.DepthStencilState.DepthEnable = false;			// あとで
+	gpsDesc.DepthStencilState.DepthEnable = true;
 	gpsDesc.DepthStencilState.StencilEnable = false;		// あとで
-	gpsDesc.DSVFormat = DXGI_FORMAT_D32_FLOAT;				// 必須
-	gpsDesc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
-	gpsDesc.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
+	gpsDesc.DSVFormat = DXGI_FORMAT_D32_FLOAT;				// 必須(DSV)
+	gpsDesc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;	// DSV必須
+	gpsDesc.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS;		// 小さいほうを返す
 
 	// ラスタライザ
 	gpsDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
@@ -292,8 +294,8 @@ void Dx12Wrapper::InitPipelineState()
 	gpsDesc.SampleDesc.Count = 1;		// いる
 	gpsDesc.SampleDesc.Quality = 0;		// いる
 	gpsDesc.SampleMask = 0xffffffff;	// 全部1
-	//gpsDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;	// 三角形
-	gpsDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_POINT;	// 点
+	gpsDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;	// 三角形
+	//gpsDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_POINT;	// 点
 
 	auto result = dev->CreateGraphicsPipelineState(&gpsDesc, IID_PPV_ARGS(&pipelineState));
 }
@@ -333,6 +335,48 @@ ID3D12Resource* Dx12Wrapper::CreateTextureResource(ID3D12Resource* buff, const u
 		return buff;
 	}
 	return nullptr;
+}
+
+void Dx12Wrapper::CreateDepthBuff()
+{
+	auto wsize = Application::Instance().GetWindowSize();
+
+	D3D12_RESOURCE_DESC depthResDesc = {};
+	depthResDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+	depthResDesc.Width = wsize.width;
+	depthResDesc.Height = wsize.height;
+	depthResDesc.DepthOrArraySize = 1;
+	depthResDesc.Format = DXGI_FORMAT_D32_FLOAT;
+	depthResDesc.SampleDesc.Count = 1;
+	depthResDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
+	depthResDesc.MipLevels = 1;
+
+	// このクリアバリューが重要な意味を持つので今回は作っておく
+	D3D12_CLEAR_VALUE _depthClearValue = {};
+	_depthClearValue.DepthStencil.Depth = 1.0f;	// 深さ最大値は1
+	_depthClearValue.Format = DXGI_FORMAT_D32_FLOAT;
+
+	// 深度バッファの作成
+	auto result = dev->CreateCommittedResource(
+		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+		D3D12_HEAP_FLAG_NONE,
+		&depthResDesc,
+		D3D12_RESOURCE_STATE_DEPTH_WRITE,
+		&_depthClearValue,
+		IID_PPV_ARGS(&depthBuff));
+	
+
+	D3D12_DESCRIPTOR_HEAP_DESC _dsvHeapDesc = {};	// 特に設定の必要はない
+	_dsvHeapDesc.NumDescriptors = 1;
+	_dsvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
+	result = dev->CreateDescriptorHeap(&_dsvHeapDesc, IID_PPV_ARGS(&dsvHeap));
+
+	D3D12_DEPTH_STENCIL_VIEW_DESC _dsvDesc = {};
+	_dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
+	_dsvDesc.Format = DXGI_FORMAT_D32_FLOAT;
+
+	// 深度バッファビューの作成
+	dev->CreateDepthStencilView(depthBuff, &_dsvDesc, dsvHeap->GetCPUDescriptorHandleForHeapStart());
 }
 
 void Dx12Wrapper::ClearCmd(ID3D12PipelineState* pipelinestate, ID3D12RootSignature* rootsignature)
@@ -445,16 +489,8 @@ void Dx12Wrapper::Pmd()
 	unsigned int vertexCount;
 	fread(&vertexCount, sizeof(vertexCount), 1, fp);
 	// 頂点の数だけ頂点リスト読み込み
-	pmdVertexDatas.resize(vertexCount);
-	for (int i = 0; i < pmdVertexDatas.size(); ++i)
-	{
-		fread(&pmdVertexDatas[i].pos,			sizeof(pmdVertexDatas[i].pos),			1, fp);
-		fread(&pmdVertexDatas[i].normal_vec,	sizeof(pmdVertexDatas[i].normal_vec),	1, fp);
-		fread(&pmdVertexDatas[i].uv,			sizeof(pmdVertexDatas[i].uv),			1, fp);
-		fread(&pmdVertexDatas[i].bone_num,		sizeof(pmdVertexDatas[i].bone_num),		1, fp);
-		fread(&pmdVertexDatas[i].bone_weight,	sizeof(pmdVertexDatas[i].bone_weight),	1, fp);
-		fread(&pmdVertexDatas[i].edge_flag,		sizeof(pmdVertexDatas[i].edge_flag),	1, fp);
-	}
+	pmdVertexDatas.resize(vertexCount * (sizeof(VertexData)-2));
+	fread(pmdVertexDatas.data(), pmdVertexDatas.size(), 1, fp);
 
 	// 面頂点数読み込み
 	unsigned int faceVertexCount;
@@ -475,7 +511,7 @@ void Dx12Wrapper::CreatePmdVertexBuffer()
 
 	D3D12_RESOURCE_DESC resdesc = {};
 	resdesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-	resdesc.Width = (sizeof(pmdVertexDatas[0]) * pmdVertexDatas.size());	// 頂点情報が入るだけのサイズ
+	resdesc.Width = pmdVertexDatas.size();	// 頂点情報が入るだけのサイズ
 	resdesc.Height = 1;
 	resdesc.DepthOrArraySize = 1;
 	resdesc.MipLevels = 1;
@@ -490,18 +526,23 @@ void Dx12Wrapper::CreatePmdVertexBuffer()
 
 	// インデックスバッファの作成
 	result = dev->CreateCommittedResource(&heapprop, D3D12_HEAP_FLAG_NONE,
-		&CD3DX12_RESOURCE_DESC::Buffer(pmdVertexDatas.size()),
+		&CD3DX12_RESOURCE_DESC::Buffer(pmdFaceVertices.size() * sizeof(pmdFaceVertices[0])),
 		D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&pmdIndexBuffer));
 
 	D3D12_RANGE range = { 0,0 };
-	VertexData* vertexMap = nullptr;
-	result = pmdVertexBuffer->Map(0, nullptr, (void**)&vertexMap);
+	char* vertexMap = nullptr;
+	result = pmdVertexBuffer->Map(0, &range, (void**)&vertexMap);
 	std::copy(pmdVertexDatas.begin(), pmdVertexDatas.end(), vertexMap);
 	pmdVertexBuffer->Unmap(0, nullptr);
 
 	pmdVbView.BufferLocation = pmdVertexBuffer->GetGPUVirtualAddress();
-	pmdVbView.StrideInBytes = sizeof(pmdVertexDatas[0]);	// 頂点1つあたりのバイト数
-	pmdVbView.SizeInBytes = pmdVertexDatas.size();			// データ全体のサイズ
+	pmdVbView.StrideInBytes = sizeof(VertexData)-2;	// 頂点1つあたりのバイト数
+	pmdVbView.SizeInBytes = pmdVertexDatas.size();	// データ全体のサイズ
+
+	unsigned short* ibuffptr = nullptr;
+	result = pmdIndexBuffer->Map(0, &range, (void**)&ibuffptr);
+	std::copy(pmdFaceVertices.begin(), pmdFaceVertices.end(), ibuffptr);
+	pmdIndexBuffer->Unmap(0, nullptr);
 
 	pmdIbView.BufferLocation = pmdIndexBuffer->GetGPUVirtualAddress();	// バッファの場所
 	pmdIbView.Format = DXGI_FORMAT_R16_UINT;	// フォーマット(shortなのでR16)
@@ -579,6 +620,7 @@ Dx12Wrapper::Dx12Wrapper(HWND hwnd)
 
 	Pmd();
 	CreatePmdVertexBuffer();
+	CreateDepthBuff();
 
 	CreateVertexBuffer();
 
@@ -617,6 +659,10 @@ Dx12Wrapper::~Dx12Wrapper()
 	texBuff->Release();
 	texHeap->Release();
 	constBuff->Release();
+	pmdVertexBuffer->Release();
+	pmdIndexBuffer->Release();
+	depthBuff->Release();
+	dsvHeap->Release();
 }
 
 void Dx12Wrapper::Update()
@@ -682,8 +728,9 @@ void Dx12Wrapper::Draw()
 	auto heapStart = rtvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
 	bbIdx = swapChain->GetCurrentBackBufferIndex();		// ﾊﾞｯｸﾊﾞｯﾌｧｲﾝﾃﾞｯｽｸを調べる
 	heapStart.ptr += bbIdx * dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-	float clearColor[] = { 1.0f, 1.0f, 1.0f, 1.0f };				// クリアカラー設定
-	cmdList->OMSetRenderTargets(1, &heapStart, false, nullptr);		// レンダーターゲット設定
+	float clearColor[] = { 0.0f, 0.0f, 0.0f, 1.0f };				// クリアカラー設定
+	cmdList->OMSetRenderTargets(1, &heapStart, false, &dsvHeap->GetCPUDescriptorHandleForHeapStart());		// レンダーターゲット設定
+	cmdList->ClearDepthStencilView(dsvHeap->GetCPUDescriptorHandleForHeapStart(), D3D12_CLEAR_FLAG_DEPTH, 1.f, 0, 0, nullptr);	// 深度バッファのクリア
 
 	// バリアの解除(ここから書き込みが始まる)
 	UnlockBarrier(backBuffers[bbIdx]);
@@ -694,15 +741,15 @@ void Dx12Wrapper::Draw()
 	cmdList->SetDescriptorHeaps(1, &texHeap);
 	cmdList->SetGraphicsRootDescriptorTable(0, texHeap->GetGPUDescriptorHandleForHeapStart());
 
-	cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_POINTLIST);
-	//cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	//cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_POINTLIST);
+	cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	//cmdList->IASetVertexBuffers(0, 1, &vbView);
-	cmdList->IASetIndexBuffer(&ibView);
+	//cmdList->IASetIndexBuffer(&ibView);
 	cmdList->IASetVertexBuffers(0, 1, &pmdVbView);
-	//cmdList->IASetIndexBuffer(&pmdIbView);
+	cmdList->IASetIndexBuffer(&pmdIbView);
 
 	//cmdList->DrawInstanced(4, 2, 0, 0);
-	cmdList->DrawInstanced(pmdVertexDatas.size(), 1, 0, 0);
+	cmdList->DrawIndexedInstanced(pmdFaceVertices.size(), 1, 0, 0, 0);
 
 	// バリアのセット
 	SetBarrier();

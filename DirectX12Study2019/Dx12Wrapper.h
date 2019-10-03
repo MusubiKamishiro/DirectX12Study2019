@@ -88,6 +88,11 @@ private:
 	ID3D12Resource* CreateTextureResource(ID3D12Resource* buff, const unsigned int width = 4,
 												const unsigned int height = 4, const unsigned int arraySize = 1);
 
+	// 深度バッファの作成
+	void CreateDepthBuff();
+	ID3D12Resource* depthBuff = nullptr;
+	ID3D12DescriptorHeap* dsvHeap = nullptr;
+
 	void InitConstants();	// 定数バッファの初期化
 	ID3D12Resource* constBuff = nullptr;	// 定数バッファ
 	WVP* m = nullptr;
@@ -127,7 +132,7 @@ private:
 
 	// PMD関連
 	void Pmd();
-	std::vector<VertexData> pmdVertexDatas;	// PMD頂点データ
+	std::vector<char> pmdVertexDatas;	// PMD頂点データ
 	std::vector<unsigned short> pmdFaceVertices;	// PMD面頂点データ
 	// 頂点バッファの作成
 	void CreatePmdVertexBuffer();
