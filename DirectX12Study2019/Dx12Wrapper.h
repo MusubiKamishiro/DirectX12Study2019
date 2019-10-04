@@ -8,21 +8,35 @@
 // PMDのヘッダファイル
 struct PMD
 {
-	char magic[3];			// "Pmd"
-	float version;			// バージョン
-	char model_name[20];	// モデルの名前
-	char comment[256];		// 製作者コメント
+	char magic[3];		// "Pmd"
+	float version;		// バージョン
+	char modelName[20];	// モデルの名前
+	char comment[256];	// 製作者コメント
 };
 
 // 頂点データ
-struct VertexData
+struct PMDVertexData
 {
-	float pos[3];					// x, y, z					// 座標
-	float normal_vec[3];			// nx, ny, nz				// 法線ベクトル
-	float uv[2];					// u, v						// UV座標			// MMDは頂点UV
-	unsigned short bone_num[2];		// ボーン番号1、番号2		// モデル変形(頂点移動)時に影響
-	unsigned char bone_weight;		// ボーン1に与える影響度	// min:0 max:100	// ボーン2への影響度は、(100 - bone_weight)
-	unsigned char edge_flag;		// 0:通常、1:エッジ無効		// エッジ(輪郭)が有効の場合
+	float pos[3];				// x, y, z					// 座標
+	float normalVec[3];			// nx, ny, nz				// 法線ベクトル
+	float uv[2];				// u, v						// UV座標			// MMDは頂点UV
+	unsigned short boneNum[2];	// ボーン番号1、番号2		// モデル変形(頂点移動)時に影響
+	unsigned char boneWeight;	// ボーン1に与える影響度	// min:0 max:100	// ボーン2への影響度は、(100 - bone_weight)
+	unsigned char edgeFlag;		// 0:通常、1:エッジ無効		// エッジ(輪郭)が有効の場合
+};
+
+struct PMDMaterialData
+{
+	DirectX::XMFLOAT3 diffuseColor;	// dr, dg, db	// 減衰色
+	float alpha;					// 減衰色の不透明度
+	float specularity;				// スペキュラ乗算(スペキュラの鋭さ)
+	DirectX::XMFLOAT3 specularColor;// sr, sg, sb	// 光沢色
+	DirectX::XMFLOAT3 mirrorColor;	// mr, mg, mb	// 環境色(ambient)
+	unsigned char toonIndex;		// toon??.bmp	// トゥーン
+	unsigned char edgeFlag;			// 輪郭,影
+	// パディング2個が予想される...ここまでで46バイト
+	unsigned int faceVertCount;		// 面頂点数
+	char textureFileName[20];		// テクスチャファイル名
 };
 
 struct Vector3
@@ -134,12 +148,17 @@ private:
 	void Pmd();
 	std::vector<char> pmdVertexDatas;	// PMD頂点データ
 	std::vector<unsigned short> pmdFaceVertices;	// PMD面頂点データ
+	std::vector<PMDMaterialData> pmdMatDatas;	// PMDマテリアルデータ
 	// 頂点バッファの作成
 	void CreatePmdVertexBuffer();
 	ID3D12Resource* pmdVertexBuffer = nullptr;	// PMD用頂点バッファ
 	ID3D12Resource* pmdIndexBuffer = nullptr;	// PMD用インデックスバッファ
 	D3D12_VERTEX_BUFFER_VIEW pmdVbView = {};	// PMD用頂点バッファビュー
 	D3D12_INDEX_BUFFER_VIEW pmdIbView = {};		// PMD用インデックスバッファビュー
+	// マテリアルの初期化
+	void InitMaterials();
+	ID3D12DescriptorHeap* matDescriptorHeap;	// PMDマテリアル用デスクリプタヒープ
+	std::vector<ID3D12Resource*> materialBuffs;	// PMDマテリアル用バッファ(マテリアル1つにつき1個)
 
 
 public:

@@ -1,15 +1,24 @@
-// ﾃｸｽﾁｬ(0番)
+// テクスチャ(0番)
 Texture2D<float4> tex	: register(t0);
-// ｻﾝﾌﾟﾗ(0)
+// サンプラ(0番)
 SamplerState smp : register(s0);
-// 定数バッファ
+// 定数バッファ(0番)
 cbuffer mat : register(b0)
 {
-	matrix world;		// ﾜｰﾙﾄﾞ
-	matrix viewProj;	// ﾋﾞｭｰﾌﾟﾛｼﾞｪｸｼｮﾝ
+	matrix world;		// ワールド
+	matrix viewProj;	// ビュープロジェクション
 	matrix wvp;			// 合成済み
-	matrix lightVP;		// ﾗｲﾄﾋﾞｭｰﾌﾟﾛｼﾞｪｸｼｮﾝ
+	matrix lightVP;		// ライトビュープロジェクション
 };
+
+// 定数ﾊﾞｯﾌｧ(1番)
+cbuffer material : register(b1)
+{
+	float3 diffuse;		// ディフューズカラー(減光色)
+	float3 specular;	// スペキュラカラー(光沢色)
+	float3 mirror;		// アンビエントカラー(環境色)
+};
+
 
 struct Output
 {
@@ -41,10 +50,10 @@ float4 ps(Output output) : SV_TARGET
 	//return float4(tex.Sample(smp, output.uv).rgb, 1.0f);
 	//return float4(1.0f, 1.0f, 1.0f, 1.0f);
 
-	return float4(float3(output.normal.rgb), 1.0f);
+	//return float4(float3(output.normal.rgb), 1.0f);
 
-	/*float3 light = float3(1, 1, 1);
+	float3 light = float3(-1, 1, -1);
 	light = normalize(light);
 	float brightness = dot(output.normal.rgb, light);
-	return float4(brightness, brightness, brightness, 1.0);*/
+	return float4(float3(diffuse) * brightness, 1.0);
 }

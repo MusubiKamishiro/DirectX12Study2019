@@ -200,23 +200,34 @@ void Dx12Wrapper::InitShader()
 
 void Dx12Wrapper::InitRootSignatur()
 {
-	D3D12_DESCRIPTOR_RANGE descRange[2] = {};
+	D3D12_DESCRIPTOR_RANGE descRange[3] = {};
 	// ここから"t0"を流してる
 	descRange[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-	descRange[0].BaseShaderRegister = 0;		// ﾚｼﾞｽﾀ番号
+	descRange[0].BaseShaderRegister = 0;		// レジスタ番号
 	descRange[0].NumDescriptors = 1;			// 1回で読む数
 	descRange[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
-
+	// "b0"	wvp
 	descRange[1].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
-	descRange[1].BaseShaderRegister = 0;		// ﾚｼﾞｽﾀ番号
+	descRange[1].BaseShaderRegister = 0;		// レジスタ番号
 	descRange[1].NumDescriptors = 1;			// 1回で読む数
 	descRange[1].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+	// "b1"	dsm
+	descRange[2].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;	// 定数バッファ
+	descRange[2].BaseShaderRegister = 1;						// レジスタ番号
+	descRange[2].NumDescriptors = pmdMatDatas.size();			// 1回で読む数
+	descRange[2].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+	
 
-	D3D12_ROOT_PARAMETER rootParam = {};
-	rootParam.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-	rootParam.DescriptorTable.NumDescriptorRanges = 2;		// レンジの数
-	rootParam.DescriptorTable.pDescriptorRanges = &descRange[0];	// 対応するレンジへのポインタ
-	rootParam.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+	D3D12_ROOT_PARAMETER rootParam[2] = {};
+	rootParam[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+	rootParam[0].DescriptorTable.NumDescriptorRanges = 2;		// レンジの数
+	rootParam[0].DescriptorTable.pDescriptorRanges = &descRange[0];	// 対応するレンジへのポインタ
+	rootParam[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+
+	rootParam[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+	rootParam[1].DescriptorTable.NumDescriptorRanges = 1;		// レンジの数
+	rootParam[1].DescriptorTable.pDescriptorRanges = &descRange[2];	// 対応するレンジへのポインタ
+	rootParam[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
 
 	// サンプラの設定
@@ -236,9 +247,9 @@ void Dx12Wrapper::InitRootSignatur()
 
 	D3D12_ROOT_SIGNATURE_DESC rsd = {};
 	rsd.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
-	rsd.NumParameters = 1;
+	rsd.NumParameters = 2;
 	rsd.NumStaticSamplers = 1;
-	rsd.pParameters = &rootParam;
+	rsd.pParameters = &rootParam[0];
 	rsd.pStaticSamplers = &samplerDesc;
 
 	ID3DBlob* signature = nullptr;		// ルートシグネチャをつくるための材料
@@ -274,7 +285,7 @@ void Dx12Wrapper::InitPipelineState()
 	gpsDesc.PS = CD3DX12_SHADER_BYTECODE(pixelShader);		// ピクセルシェーダ
 
 	// レンダターゲット
-	gpsDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;		// このﾀｰｹﾞｯﾄ数と設定するフォーマット数は
+	gpsDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;		// このターゲット数と設定するフォーマット数は
 	gpsDesc.NumRenderTargets = 1;							// 一致させておく
 
 	// 深度ステンシル
@@ -443,7 +454,7 @@ void Dx12Wrapper::CreateTex()
 	box.front = 0;
 	box.back = 1;
 
-	// ﾃｸｽﾁｬ書き込み
+	// テクスチャ書き込み
 	result = texBuff->WriteToSubresource(
 		0,
 		&box,
@@ -451,14 +462,14 @@ void Dx12Wrapper::CreateTex()
 		metadata.width * 4,
 		img.GetPixelsSize());
 
-	// ﾋｰﾌﾟの設定
+	// ヒープの設定
 	D3D12_DESCRIPTOR_HEAP_DESC descHeapDesc = {};
 	descHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 	descHeapDesc.NodeMask = 0;
 	descHeapDesc.NumDescriptors = 2;
 	descHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 
-	// ﾋｰﾌﾟ作成
+	// ヒープ作成
 	result = dev->CreateDescriptorHeap(&descHeapDesc, IID_PPV_ARGS(&texHeap));
 
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
@@ -482,14 +493,14 @@ void Dx12Wrapper::Pmd()
 	PMD pmdData;
 	fread(&pmdData.magic, sizeof(pmdData.magic), 1, fp);
 	fread(&pmdData.version, sizeof(pmdData.version), 1, fp);
-	fread(&pmdData.model_name, sizeof(pmdData.model_name), 1, fp);
+	fread(&pmdData.modelName, sizeof(pmdData.modelName), 1, fp);
 	fread(&pmdData.comment, sizeof(pmdData.comment), 1, fp);
 
 	// 頂点数読み込み
 	unsigned int vertexCount;
 	fread(&vertexCount, sizeof(vertexCount), 1, fp);
 	// 頂点の数だけ頂点リスト読み込み
-	pmdVertexDatas.resize(vertexCount * (sizeof(VertexData)-2));
+	pmdVertexDatas.resize(vertexCount * (sizeof(PMDVertexData)-2));
 	fread(pmdVertexDatas.data(), pmdVertexDatas.size(), 1, fp);
 
 	// 面頂点数読み込み
@@ -499,7 +510,25 @@ void Dx12Wrapper::Pmd()
 	pmdFaceVertices.resize(faceVertexCount);
 	fread(pmdFaceVertices.data(), pmdFaceVertices.size() * sizeof(unsigned short), 1, fp);
 
-
+	// マテリアル数読み込み
+	unsigned int matCount;
+	fread(&matCount, sizeof(matCount), 1, fp);
+	// マテリアル読み込み
+	pmdMatDatas.resize(matCount);
+	for (auto& pmdMatData : pmdMatDatas)
+	{
+		fread(&pmdMatData.diffuseColor,		sizeof(pmdMatData.diffuseColor),	1, fp);
+		fread(&pmdMatData.alpha,			sizeof(pmdMatData.alpha),			1, fp);
+		fread(&pmdMatData.specularity,		sizeof(pmdMatData.specularity),		1, fp);
+		fread(&pmdMatData.specularColor,	sizeof(pmdMatData.specularColor),	1, fp);
+		fread(&pmdMatData.mirrorColor,		sizeof(pmdMatData.mirrorColor),		1, fp);
+		fread(&pmdMatData.toonIndex,		sizeof(pmdMatData.toonIndex),		1, fp);
+		fread(&pmdMatData.edgeFlag,			sizeof(pmdMatData.edgeFlag),		1, fp);
+		fread(&pmdMatData.faceVertCount,	sizeof(pmdMatData.faceVertCount),	1, fp);
+		fread(&pmdMatData.textureFileName,	sizeof(pmdMatData.textureFileName),	1, fp);
+	}
+	
+	fclose(fp);
 }
 
 void Dx12Wrapper::CreatePmdVertexBuffer()
@@ -536,7 +565,7 @@ void Dx12Wrapper::CreatePmdVertexBuffer()
 	pmdVertexBuffer->Unmap(0, nullptr);
 
 	pmdVbView.BufferLocation = pmdVertexBuffer->GetGPUVirtualAddress();
-	pmdVbView.StrideInBytes = sizeof(VertexData)-2;	// 頂点1つあたりのバイト数
+	pmdVbView.StrideInBytes = sizeof(PMDVertexData)-2;	// 頂点1つあたりのバイト数
 	pmdVbView.SizeInBytes = pmdVertexDatas.size();	// データ全体のサイズ
 
 	unsigned short* ibuffptr = nullptr;
@@ -556,7 +585,7 @@ void Dx12Wrapper::InitConstants()
 	DirectX::XMMATRIX world = DirectX::XMMatrixIdentity();
 	mappedMatrix.world = world;
 
-	// ｶﾒﾗの設定
+	// カメラの設定
 	auto eyePos = DirectX::XMFLOAT3(0, 20, -15);	// カメラの位置(視点)
 	auto focusPos = DirectX::XMFLOAT3(0, 10, 0);	// 焦点の位置(注視点)
 	auto up = DirectX::XMFLOAT3(0.0f, 1.0f, 0.0f);	// カメラの上方向(通常は(0.0f, 1.0f, 0.0f))	// カメラを固定するためのもの
@@ -599,6 +628,59 @@ void Dx12Wrapper::InitConstants()
 	dev->CreateConstantBufferView(&cbvDesc, handle);
 }
 
+void Dx12Wrapper::InitMaterials()
+{
+	// バッファのリサイズ
+	materialBuffs.resize(pmdMatDatas.size());
+
+	// ヒープの設定
+	D3D12_DESCRIPTOR_HEAP_DESC descHeapDesc = {};
+	descHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+	descHeapDesc.NodeMask = 0;
+	descHeapDesc.NumDescriptors = materialBuffs.size();
+	descHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+
+	// ヒープ作成
+	auto result = dev->CreateDescriptorHeap(&descHeapDesc, IID_PPV_ARGS(&matDescriptorHeap));
+
+	size_t size = sizeof(mappedMatrix);
+	size = (size + 0xff) & ~0xff;		// 256アライメントに合わせている
+
+	D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
+	cbvDesc.SizeInBytes = size;
+
+	// ハンドルの取得
+	auto handle = matDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
+
+	// マテリアル数分作る
+	for (int i = 0; i < materialBuffs.size(); ++i)
+	{
+		// リソース作成
+		result = dev->CreateCommittedResource(
+			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+			D3D12_HEAP_FLAG_NONE,
+			&CD3DX12_RESOURCE_DESC::Buffer(size),
+			D3D12_RESOURCE_STATE_GENERIC_READ,
+			nullptr,
+			IID_PPV_ARGS(&materialBuffs[i]));
+
+		PMDMaterialData* matMap = nullptr;
+		// マップする
+		result = materialBuffs[i]->Map(0, nullptr, (void**)& matMap);
+		// 着色
+		matMap->diffuseColor = pmdMatDatas[i].diffuseColor;		// 減光色
+		matMap->specularColor = pmdMatDatas[i].specularColor;	// 光沢色
+		matMap->mirrorColor = pmdMatDatas[i].mirrorColor;		// 環境色
+
+		// アンマップ
+		materialBuffs[i]->Unmap(0, nullptr);
+		cbvDesc.BufferLocation = materialBuffs[i]->GetGPUVirtualAddress();
+
+		dev->CreateConstantBufferView(&cbvDesc, handle);
+		handle.ptr += dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	}
+}
+
 Dx12Wrapper::Dx12Wrapper(HWND hwnd)
 {
 #ifdef _DEBUG
@@ -612,7 +694,7 @@ Dx12Wrapper::Dx12Wrapper(HWND hwnd)
 	CreateSwapChain(hwnd);
 	CreateRenderTarget();
 	
-	// ｺﾏﾝﾄﾞｱﾛｹｰﾀとｺﾏﾝﾄﾞﾘｽﾄの生成
+	// コマンドアロケータとコマンドリストの生成
 	result = dev->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&cmdAllocator));
 	result = dev->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, cmdAllocator, nullptr, IID_PPV_ARGS(&cmdList));
 	// フェンスの作成
@@ -620,6 +702,7 @@ Dx12Wrapper::Dx12Wrapper(HWND hwnd)
 
 	Pmd();
 	CreatePmdVertexBuffer();
+	InitMaterials();
 	CreateDepthBuff();
 
 	CreateVertexBuffer();
@@ -663,6 +746,12 @@ Dx12Wrapper::~Dx12Wrapper()
 	pmdIndexBuffer->Release();
 	depthBuff->Release();
 	dsvHeap->Release();
+	matDescriptorHeap->Release();
+
+	for (auto& matBuff : materialBuffs)
+	{
+		matBuff->Release();
+	}
 }
 
 void Dx12Wrapper::Update()
@@ -743,13 +832,24 @@ void Dx12Wrapper::Draw()
 
 	//cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_POINTLIST);
 	cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	//cmdList->IASetVertexBuffers(0, 1, &vbView);
-	//cmdList->IASetIndexBuffer(&ibView);
 	cmdList->IASetVertexBuffers(0, 1, &pmdVbView);
 	cmdList->IASetIndexBuffer(&pmdIbView);
 
 	//cmdList->DrawInstanced(4, 2, 0, 0);
-	cmdList->DrawIndexedInstanced(pmdFaceVertices.size(), 1, 0, 0, 0);
+	//cmdList->DrawIndexedInstanced(pmdFaceVertices.size(), 1, 0, 0, 0);
+
+	// モデルの描画
+	unsigned int offset = 0;
+	cmdList->SetDescriptorHeaps(1, &matDescriptorHeap);
+	auto handle = matDescriptorHeap->GetGPUDescriptorHandleForHeapStart();
+	for (auto& mat : pmdMatDatas)
+	{
+		cmdList->SetGraphicsRootDescriptorTable(1, handle);
+		handle.ptr += dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+		cmdList->DrawIndexedInstanced(mat.faceVertCount, 1, offset, 0, 0);
+		offset += mat.faceVertCount;
+	}
+
 
 	// バリアのセット
 	SetBarrier();
