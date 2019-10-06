@@ -440,7 +440,8 @@ void Dx12Wrapper::CreateTex()
 	DirectX::ScratchImage img;
 	// âÊëúì«Ç›çûÇ›
 	//result = LoadFromWICFile(L"img/masaki.png", DirectX::WIC_FLAGS_NONE, &metadata, img);
-	result = LoadFromWICFile(L"img/rinze.png", DirectX::WIC_FLAGS_NONE, &metadata, img);
+	//result = LoadFromWICFile(L"img/rinze.png", DirectX::WIC_FLAGS_NONE, &metadata, img);
+	result = LoadFromWICFile(L"img/kaho.png", DirectX::WIC_FLAGS_NONE, &metadata, img);
 	texBuff = CreateTextureResource(texBuff, metadata.width, metadata.height, metadata.arraySize);
 
 	D3D12_RESOURCE_DESC resdesc = {};
