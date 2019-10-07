@@ -54,6 +54,8 @@ float4 ps(Output output) : SV_TARGET
 
 	float3 light = float3(-1, 1, -1);
 	light = normalize(light);
+
+	float3 matcolor = diffuse + specular + (mirror * 0.6f);
 	float brightness = dot(output.normal.rgb, light);
-	return float4(float3(diffuse) * brightness, 1.0);
+	return float4(matcolor * brightness, 1.0);
 }

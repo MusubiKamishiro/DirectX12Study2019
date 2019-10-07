@@ -4,6 +4,7 @@
 #include <DirectXMath.h>
 
 #include <vector>
+#include <string>
 
 // PMDのヘッダファイル
 struct PMD
@@ -142,10 +143,13 @@ private:
 	///確認が終わり次第削除すること
 	ID3D12Resource* texBuff = nullptr;
 	ID3D12DescriptorHeap* texHeap = nullptr;
-	void CreateTex();	// テクスチャ画像の作成
+	// テクスチャ画像の作成
+	//@param texpath テクスチャのパス
+	void CreateTex(std::string& texpath);
 
 	// PMD関連
-	void Pmd();
+	//@param	モデルのパス
+	void Pmd(std::string& filepath);
 	std::vector<char> pmdVertexDatas;	// PMD頂点データ
 	std::vector<unsigned short> pmdFaceVertices;	// PMD面頂点データ
 	std::vector<PMDMaterialData> pmdMatDatas;	// PMDマテリアルデータ
@@ -159,7 +163,16 @@ private:
 	void InitMaterials();
 	ID3D12DescriptorHeap* matDescriptorHeap;	// PMDマテリアル用デスクリプタヒープ
 	std::vector<ID3D12Resource*> materialBuffs;	// PMDマテリアル用バッファ(マテリアル1つにつき1個)
-
+	// モデルのテクスチャの作成
+	void CreateModelTexture();
+	std::vector<ID3D12Resource*> modelTexBuff;
+	// モデルのテクスチャのパスを獲得
+	std::string GetModelTexturePath(const std::string& modelpath, const char* texpath);
+	std::vector<std::string> modelTexturesPath;	// モデルに張り付けるテクスチャのパス(中身がないときもある)
+	// string(マルチバイト文字列)からwstring(ワイド文字列)を得る
+	//@param str マルチバイト文字列
+	//@return 変換されたワイド文字列
+	std::wstring GetWideStringFromString(std::string& str);
 
 public:
 	Dx12Wrapper(HWND hwnd);

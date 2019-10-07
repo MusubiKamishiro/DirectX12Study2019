@@ -432,16 +432,14 @@ void Dx12Wrapper::WaitExecute()
 	}
 }
 
-void Dx12Wrapper::CreateTex()
+void Dx12Wrapper::CreateTex(std::string& texpath)
 {
 	auto result = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
 
 	DirectX::TexMetadata metadata;
 	DirectX::ScratchImage img;
 	// 画像読み込み
-	//result = LoadFromWICFile(L"img/masaki.png", DirectX::WIC_FLAGS_NONE, &metadata, img);
-	//result = LoadFromWICFile(L"img/rinze.png", DirectX::WIC_FLAGS_NONE, &metadata, img);
-	result = LoadFromWICFile(L"img/kaho.png", DirectX::WIC_FLAGS_NONE, &metadata, img);
+	result = LoadFromWICFile(GetWideStringFromString(texpath).c_str(), DirectX::WIC_FLAGS_NONE, &metadata, img);
 	texBuff = CreateTextureResource(texBuff, metadata.width, metadata.height, metadata.arraySize);
 
 	D3D12_RESOURCE_DESC resdesc = {};
@@ -481,12 +479,12 @@ void Dx12Wrapper::CreateTex()
 	dev->CreateShaderResourceView(texBuff, &srvDesc, texHeap->GetCPUDescriptorHandleForHeapStart());
 }
 
-void Dx12Wrapper::Pmd()
+void Dx12Wrapper::Pmd(std::string& filepath)
 {
 	// モデルの読み込み
 	FILE* fp;
 	errno_t error;
-	error = fopen_s(&fp, "model/miku/初音ミク.pmd", "rb");	
+	error = fopen_s(&fp, filepath.c_str(), "rb");	
 
 	assert(error == 0);	// 読み込めなかった場合警告を吐く
 	
@@ -516,17 +514,23 @@ void Dx12Wrapper::Pmd()
 	fread(&matCount, sizeof(matCount), 1, fp);
 	// マテリアル読み込み
 	pmdMatDatas.resize(matCount);
-	for (auto& pmdMatData : pmdMatDatas)
+	modelTexturesPath.resize(matCount);
+	for(int i = 0; i < pmdMatDatas.size(); ++i)
 	{
-		fread(&pmdMatData.diffuseColor,		sizeof(pmdMatData.diffuseColor),	1, fp);
-		fread(&pmdMatData.alpha,			sizeof(pmdMatData.alpha),			1, fp);
-		fread(&pmdMatData.specularity,		sizeof(pmdMatData.specularity),		1, fp);
-		fread(&pmdMatData.specularColor,	sizeof(pmdMatData.specularColor),	1, fp);
-		fread(&pmdMatData.mirrorColor,		sizeof(pmdMatData.mirrorColor),		1, fp);
-		fread(&pmdMatData.toonIndex,		sizeof(pmdMatData.toonIndex),		1, fp);
-		fread(&pmdMatData.edgeFlag,			sizeof(pmdMatData.edgeFlag),		1, fp);
-		fread(&pmdMatData.faceVertCount,	sizeof(pmdMatData.faceVertCount),	1, fp);
-		fread(&pmdMatData.textureFileName,	sizeof(pmdMatData.textureFileName),	1, fp);
+		fread(&pmdMatDatas[i].diffuseColor,		sizeof(pmdMatDatas[i].diffuseColor),	1, fp);
+		fread(&pmdMatDatas[i].alpha,			sizeof(pmdMatDatas[i].alpha),			1, fp);
+		fread(&pmdMatDatas[i].specularity,		sizeof(pmdMatDatas[i].specularity),		1, fp);
+		fread(&pmdMatDatas[i].specularColor,	sizeof(pmdMatDatas[i].specularColor),	1, fp);
+		fread(&pmdMatDatas[i].mirrorColor,		sizeof(pmdMatDatas[i].mirrorColor),		1, fp);
+		fread(&pmdMatDatas[i].toonIndex,		sizeof(pmdMatDatas[i].toonIndex),		1, fp);
+		fread(&pmdMatDatas[i].edgeFlag,			sizeof(pmdMatDatas[i].edgeFlag),		1, fp);
+		fread(&pmdMatDatas[i].faceVertCount,	sizeof(pmdMatDatas[i].faceVertCount),	1, fp);
+		fread(&pmdMatDatas[i].textureFileName,	sizeof(pmdMatDatas[i].textureFileName),	1, fp);
+
+		if (std::strlen(pmdMatDatas[i].textureFileName) > 0)
+		{
+			modelTexturesPath[i] = GetModelTexturePath(filepath, pmdMatDatas[i].textureFileName);
+		}
 	}
 	
 	fclose(fp);
@@ -682,6 +686,43 @@ void Dx12Wrapper::InitMaterials()
 	}
 }
 
+void Dx12Wrapper::CreateModelTexture()
+{
+	unsigned int matNum = ;
+
+	std::vector<DirectX::TexMetadata> metadata = {};
+	std::vector<DirectX::ScratchImage> img;
+	modelTexBuff.resize(matNum);
+	metadata.resize(matNum);
+	img.resize(matNum);
+
+
+}
+
+std::string Dx12Wrapper::GetModelTexturePath(const std::string& modelpath, const char* texpath)
+{
+	auto spoint = modelpath.rfind("/");		// "/"を逆から探索 
+	auto path = (modelpath.substr(0, spoint) + "/" + texpath);		// ﾊﾟｽの合成
+	return path;
+}
+
+std::wstring Dx12Wrapper::GetWideStringFromString(std::string& str)
+{
+	// 呼び出し1回目(文字列数を得る)
+	auto bsize = MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED | MB_ERR_INVALID_CHARS,
+									str.c_str(), -1, nullptr, 0);
+
+	// stringのwchar_t版, 得られた文字列数でリサイズしておく
+	std::wstring wstr;
+	wstr.resize(bsize);
+
+	// 呼び出し2回目(確保済のwstrに変換文字列をコピー)
+	bsize = MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED | MB_ERR_INVALID_CHARS,
+									str.c_str(), -1, &wstr[0], bsize);
+
+	return wstr;
+}
+
 Dx12Wrapper::Dx12Wrapper(HWND hwnd)
 {
 #ifdef _DEBUG
@@ -701,16 +742,21 @@ Dx12Wrapper::Dx12Wrapper(HWND hwnd)
 	// フェンスの作成
 	result = dev->CreateFence(fenceValue, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence));
 
-	Pmd();
+	std::string modelPath = "model/miku/初音ミク.pmd";
+	Pmd(modelPath);
 	CreatePmdVertexBuffer();
 	InitMaterials();
 	CreateDepthBuff();
+	CreateModelTexture();
 
 	CreateVertexBuffer();
 
 	InitShader();
 
-	CreateTex();
+	//std::string texPath = "img/masaki.png";
+	//std::string texPath = "img/rinze.png";
+	std::string texPath = "img/kaho.png";
+	CreateTex(texPath);
 
 	InitConstants();
 
