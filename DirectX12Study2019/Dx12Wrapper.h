@@ -141,11 +141,8 @@ private:
 
 	///ここから一時的な試験のための物
 	///確認が終わり次第削除すること
-	ID3D12Resource* texBuff = nullptr;
-	ID3D12DescriptorHeap* texHeap = nullptr;
-	// テクスチャ画像の作成
-	//@param texpath テクスチャのパス
-	void CreateTex(std::string& texpath);
+	ID3D12DescriptorHeap* rgstDescriptorHeap = nullptr;
+
 
 	// PMD関連
 	//@param	モデルのパス
