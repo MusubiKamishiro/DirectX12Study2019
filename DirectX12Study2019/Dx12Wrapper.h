@@ -143,6 +143,16 @@ private:
 	///確認が終わり次第削除すること
 	ID3D12DescriptorHeap* rgstDescriptorHeap = nullptr;
 
+	// 拡張子を取得する
+	//@param path 対象パスの文字列
+	//@return 拡張子
+	std::string GetExtension(const char* path);
+
+	//テクスチャのパスをセパレータ文字で分離する
+	//@param path 対象のパス文字列
+	//@param splitter 区切り文字
+	//@return 分離前後の文字列ペア
+	std::pair<std::string, std::string> SplitFileName(const std::string& path, const char splitter = '*');
 
 	// PMD関連
 	//@param	モデルのパス
@@ -162,10 +172,16 @@ private:
 	std::vector<ID3D12Resource*> materialBuffs;	// PMDマテリアル用バッファ(マテリアル1つにつき1個)
 	// モデルのテクスチャの作成
 	void CreateModelTexture();
-	std::vector<ID3D12Resource*> modelTexBuff;
+	std::vector<ID3D12Resource*> modelTexBuff;	// 通常テクスチャ
+	std::vector<ID3D12Resource*> spaBuff;		// 加算テクスチャ
+	std::vector<ID3D12Resource*> sphBuff;		// 乗算テクスチャ
+	//std::vector<ID3D12Resource*> toonBuff;		// トゥーンテクスチャ
 	// 白テクスチャ作成
 	void CreateWhiteTexture();
 	ID3D12Resource* whiteTexBuff;
+	// 黒テクスチャ作成
+	void CreateBlackTexture();
+	ID3D12Resource* blackTexBuff;
 	// モデルのテクスチャのパスを獲得
 	std::string GetModelTexturePath(const std::string& modelpath, const char* texpath);
 	std::vector<std::string> modelTexturesPath;	// モデルに張り付けるテクスチャのパス(中身がないときもある)

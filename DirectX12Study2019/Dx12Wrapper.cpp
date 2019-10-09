@@ -212,9 +212,10 @@ void Dx12Wrapper::InitRootSignatur()
 	descRange[1].NumDescriptors = 1;		// 1回で読む数
 	descRange[1].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 	// "t0" マテリアルにはるテクスチャ
+	// 通常テクスチャ, 加算テクスチャ, 乗算テクスチャを一括で読む
 	descRange[2].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
 	descRange[2].BaseShaderRegister = 0;	// レジスタ番号
-	descRange[2].NumDescriptors = 1;		// 1回で読む数
+	descRange[2].NumDescriptors = 3;		// 1回で読む数
 	descRange[2].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 	
 
@@ -432,6 +433,22 @@ void Dx12Wrapper::WaitExecute()
 	}
 }
 
+std::string Dx12Wrapper::GetExtension(const char* path)
+{
+	std::string s = path;
+	size_t dpoint = s.rfind(".") + 1;		// "."の場所を探る
+	return s.substr(dpoint);
+}
+
+std::pair<std::string, std::string> Dx12Wrapper::SplitFileName(const std::string& path, const char splitter)
+{
+	int idx = path.find(splitter);
+	std::pair<std::string, std::string> ret;
+	ret.first = path.substr(0, idx);
+	ret.second = path.substr(idx + 1, path.length() - idx - 1);
+	return ret;
+}
+
 void Dx12Wrapper::Pmd(std::string& filepath)
 {
 	// モデルの読み込み
@@ -592,7 +609,7 @@ void Dx12Wrapper::InitMaterials()
 	D3D12_DESCRIPTOR_HEAP_DESC descHeapDesc = {};
 	descHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 	descHeapDesc.NodeMask = 0;
-	descHeapDesc.NumDescriptors = materialBuffs.size() * 2;
+	descHeapDesc.NumDescriptors = materialBuffs.size() * 4;
 	descHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 
 	// ヒープ作成
@@ -635,17 +652,23 @@ void Dx12Wrapper::InitMaterials()
 
 		// テクスチャがなければ、作った白テクスチャを使う。あれば、それを使う
 		auto image = whiteTexBuff;
-		if (strlen(pmdMatDatas[i].textureFileName) > 0)
+		auto spa = blackTexBuff;
+		auto sph = whiteTexBuff;
+		if (strlen(modelTexturesPath[i].c_str()) > 0)
 		{
-			std::string texFileName = pmdMatDatas[i].textureFileName;
-			size_t dpoint = 0;
-			dpoint = texFileName.rfind(".");		// "."の場所を探る
+			auto ext = GetExtension(modelTexturesPath[i].c_str());
 
-			auto path = texFileName.substr(dpoint);
-
-			if (path == ".png" || path == ".bmp" || path == ".jpg" || path == ".tga")
+			if (ext == "png" || ext == "bmp" || ext == "jpg" || ext == "tga")
 			{
 				image = modelTexBuff[i];
+			}
+			else if (ext == "spa")
+			{
+				spa = spaBuff[i];
+			}
+			else if (ext == "sph")
+			{
+				sph = sphBuff[i];
 			}
 		}
 
@@ -662,6 +685,14 @@ void Dx12Wrapper::InitMaterials()
 		// 通常テクスチャ
 		dev->CreateShaderResourceView(image, &srvDesc, handle);
 		handle.ptr += hptr;
+
+		// 加算(spa)
+		dev->CreateShaderResourceView(spa, &srvDesc, handle);
+		handle.ptr += hptr;
+
+		// 乗算(sph)
+		dev->CreateShaderResourceView(sph, &srvDesc, handle);
+		handle.ptr += hptr;
 	}
 }
 
@@ -671,45 +702,80 @@ void Dx12Wrapper::CreateModelTexture()
 
 	std::vector<DirectX::TexMetadata> metadata = {};
 	std::vector<DirectX::ScratchImage> img;
+	std::vector<DirectX::ScratchImage> spa;
+	std::vector<DirectX::ScratchImage> sph;
+
 	modelTexBuff.resize(matNum);
+	spaBuff.resize(matNum);
+	sphBuff.resize(matNum);
+	
 	metadata.resize(matNum);
 	img.resize(matNum);
+	spa.resize(matNum);
+	sph.resize(matNum);
 
 
 	for (unsigned int i = 0; i < matNum; ++i)
 	{
-		if (std::strlen(pmdMatDatas[i].textureFileName) == 0)
+		if (std::strlen(modelTexturesPath[i].c_str()) == 0)
 		{
 			// パスがなければ画像はないのでやらなくてよし
 			continue;
 		}
 
-		// "."の場所を探って拡張子を取得する
-		size_t dpoint = 0;
-		dpoint = modelTexturesPath[i].rfind(".");
-		auto path = modelTexturesPath[i].substr(dpoint);
+		// スプリッタがある
+		std::string texFileName = modelTexturesPath[i];
+		if (count(texFileName.begin(), texFileName.end(), '*') > 0)
+		{
+			auto namepair = SplitFileName(texFileName);
+			if (GetExtension(namepair.first.c_str()) == "sph" || GetExtension(namepair.first.c_str()) == "spa")
+			{
+				texFileName = namepair.second;
+			}
+			else
+			{
+				texFileName = namepair.first;
+			}
+		}
 
-		auto cPath = GetWideStringFromString(modelTexturesPath[i]);
+		auto ext = GetExtension(texFileName.c_str());
+		auto path = GetWideStringFromString(texFileName);
 
 		// 画像読み込み
 		auto result = E_FAIL;
-		if (path == ".png" || path == ".bmp" || path == ".jpg")
+		if (ext == "png" || ext == "bmp" || ext == "jpg")
 		{
-			result = DirectX::LoadFromWICFile(cPath.data(), DirectX::WIC_FLAGS_NONE, &metadata[i], img[i]);
+			result = DirectX::LoadFromWICFile(path.data(), DirectX::WIC_FLAGS_NONE, &metadata[i], img[i]);
 		}
-		else if (path == ".tga")
+		else if (ext == "tga")
 		{
-			result = DirectX::LoadFromTGAFile(cPath.data(), &metadata[i], img[i]);
+			result = DirectX::LoadFromTGAFile(path.data(), &metadata[i], img[i]);
+		}
+		else if (ext == "spa")
+		{
+			result = DirectX::LoadFromWICFile(path.data(), DirectX::WIC_FLAGS_NONE, &metadata[i], spa[i]);
+		}
+		else if (ext == "sph")
+		{
+			result = DirectX::LoadFromWICFile(path.data(), DirectX::WIC_FLAGS_NONE, &metadata[i], sph[i]);
 		}
 
 		// テクスチャバッファの作成
-		if (path == ".png" || path == ".bmp" || path == ".jpg" || path == ".tga")
+		if (ext == "png" || ext == "bmp" || ext == "jpg" || ext == "tga")
 		{
 			modelTexBuff[i] = CreateTextureResource(modelTexBuff[i], metadata[i].width, metadata[i].height, metadata[i].arraySize);
 		}
+		else if (ext == "spa")
+		{
+			spaBuff[i] = CreateTextureResource(spaBuff[i], metadata[i].width, metadata[i].height, metadata[i].arraySize);
+		}
+		else if (ext == "sph")
+		{
+			sphBuff[i] = CreateTextureResource(sphBuff[i], metadata[i].width, metadata[i].height, metadata[i].arraySize);
+		}
 
 		// テクスチャ書き込み
-		if (path == ".png" || path == ".bmp" || path == ".jpg" || path == ".tga")
+		if (ext == "png" || ext == "bmp" || ext == "jpg" || ext == "tga")
 		{
 			result = modelTexBuff[i]->WriteToSubresource(
 				0,
@@ -718,9 +784,29 @@ void Dx12Wrapper::CreateModelTexture()
 				metadata[i].width * 4,
 				img[i].GetPixelsSize());
 		}
+		else if (ext == "spa")
+		{
+			result = spaBuff[i]->WriteToSubresource(
+				0,
+				nullptr,
+				spa[i].GetPixels(),
+				metadata[i].width * 4,
+				spa[i].GetPixelsSize());
+		}
+		else if (ext == "sph")
+		{
+			result = sphBuff[i]->WriteToSubresource(
+				0,
+				nullptr,
+				sph[i].GetPixels(),
+				metadata[i].width * 4,
+				sph[i].GetPixelsSize());
+		}
 
 		// 書き込んだらもう用はないので解放
 		img[i].Release();
+		spa[i].Release();
+		sph[i].Release();
 	}
 }
 
@@ -732,6 +818,16 @@ void Dx12Wrapper::CreateWhiteTexture()
 	std::fill(data.begin(), data.end(), 0xff);	// 白
 
 	auto result = whiteTexBuff->WriteToSubresource(0, nullptr, data.data(), 4 * 4, 4 * 4 * 4);
+}
+
+void Dx12Wrapper::CreateBlackTexture()
+{
+	blackTexBuff = CreateTextureResource(blackTexBuff);
+
+	std::vector<unsigned char> data(4 * 4 * 4);
+	std::fill(data.begin(), data.end(), 0x00);	// 黒
+
+	auto result = blackTexBuff->WriteToSubresource(0, nullptr, data.data(), 4 * 4, 4 * 4 * 4);
 }
 
 std::string Dx12Wrapper::GetModelTexturePath(const std::string& modelpath, const char* texpath)
@@ -787,12 +883,14 @@ Dx12Wrapper::Dx12Wrapper(HWND hwnd)
 
 	result = dev->CreateDescriptorHeap(&descHeapDesc, IID_PPV_ARGS(&rgstDescriptorHeap));
 
-	std::string modelPath = "model/miku/初音ミク.pmd";
+	//std::string modelPath = "model/vocaloid/初音ミク.pmd";
+	std::string modelPath = "model/vocaloid/巡音ルカ.pmd";
 	Pmd(modelPath);
 
 	CreatePmdVertexBuffer();
 	CreateModelTexture();
 	CreateWhiteTexture();
+	CreateBlackTexture();
 	InitMaterials();
 	CreateDepthBuff();
 	
@@ -837,18 +935,24 @@ Dx12Wrapper::~Dx12Wrapper()
 	dsvHeap->Release();
 	matDescriptorHeap->Release();
 
-	for (auto& matBuff : materialBuffs)
+	for (int i = 0; i < materialBuffs.size(); ++i)
 	{
-		matBuff->Release();
-	}
-	for (auto& mtexBuff : modelTexBuff)
-	{
-		if (mtexBuff != nullptr)
+		materialBuffs[i]->Release();
+		if (modelTexBuff[i] != nullptr)
 		{
-			mtexBuff->Release();
+			modelTexBuff[i]->Release();
+		}
+		if (spaBuff[i] != nullptr)
+		{
+			spaBuff[i]->Release();
+		}
+		if (sphBuff[i] != nullptr)
+		{
+			sphBuff[i]->Release();
 		}
 	}
 	whiteTexBuff->Release();
+	blackTexBuff->Release();
 }
 
 void Dx12Wrapper::Update()
@@ -948,7 +1052,7 @@ void Dx12Wrapper::Draw()
 	for (auto& mat : pmdMatDatas)
 	{
 		cmdList->SetGraphicsRootDescriptorTable(1, handle);
-		handle.ptr += hptr * 2;
+		handle.ptr += hptr * 4;
 		cmdList->DrawIndexedInstanced(mat.faceVertCount, 1, offset, 0, 0);
 		offset += mat.faceVertCount;
 	}
