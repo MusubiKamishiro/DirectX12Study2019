@@ -148,7 +148,7 @@ private:
 	//@param	モデルのパス
 	void Pmd(std::string& filepath);
 	std::vector<char> pmdVertexDatas;	// PMD頂点データ
-	std::vector<unsigned short> pmdFaceVertices;	// PMD面頂点データ
+	std::vector<unsigned short> pmdFaceVertices;// PMD面頂点データ
 	std::vector<PMDMaterialData> pmdMatDatas;	// PMDマテリアルデータ
 	// 頂点バッファの作成
 	void CreatePmdVertexBuffer();
@@ -163,6 +163,9 @@ private:
 	// モデルのテクスチャの作成
 	void CreateModelTexture();
 	std::vector<ID3D12Resource*> modelTexBuff;
+	// 白テクスチャ作成
+	void CreateWhiteTexture();
+	ID3D12Resource* whiteTexBuff;
 	// モデルのテクスチャのパスを獲得
 	std::string GetModelTexturePath(const std::string& modelpath, const char* texpath);
 	std::vector<std::string> modelTexturesPath;	// モデルに張り付けるテクスチャのパス(中身がないときもある)

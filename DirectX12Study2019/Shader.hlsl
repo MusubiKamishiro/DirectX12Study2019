@@ -32,7 +32,6 @@ struct Output
 Output vs(float4 pos : POSITION, float4 normal : NORMAL, float2 uv : TEXCOORD)
 {
 	Output output;
-	//output.pos = pos;
 	output.pos = mul(world, pos);
 	//output.svpos = pos;
 	output.svpos = mul(mul(viewProj, world), pos);	// 2éüå≥è„
@@ -55,7 +54,7 @@ float4 ps(Output output) : SV_TARGET
 	float3 light = float3(-1, 1, -1);
 	light = normalize(light);
 
-	float3 matcolor = diffuse * tex.Sample(smp, output.uv) /*+ specular + (mirror * 0.6f)*/;
+	float3 matcolor = diffuse * tex.Sample(smp, output.uv).rgb /*+ specular + (mirror * 0.6f)*/;
 	float brightness = dot(light, output.normal);
 	return float4(matcolor * brightness, 1.0);
 }

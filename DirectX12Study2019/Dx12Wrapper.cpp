@@ -203,18 +203,18 @@ void Dx12Wrapper::InitRootSignatur()
 	D3D12_DESCRIPTOR_RANGE descRange[3] = {};
 	// "b0"	wvp
 	descRange[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
-	descRange[0].BaseShaderRegister = 0;		// レジスタ番号
-	descRange[0].NumDescriptors = 1;			// 1回で読む数
+	descRange[0].BaseShaderRegister = 0;	// レジスタ番号
+	descRange[0].NumDescriptors = 1;		// 1回で読む数
 	descRange[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 	// "b1"	マテリアル
 	descRange[1].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;	// 定数バッファ
-	descRange[1].BaseShaderRegister = 1;						// レジスタ番号
-	descRange[1].NumDescriptors = 1/*pmdMatDatas.size()*/;			// 1回で読む数
+	descRange[1].BaseShaderRegister = 1;	// レジスタ番号
+	descRange[1].NumDescriptors = 1;		// 1回で読む数
 	descRange[1].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 	// "t0" マテリアルにはるテクスチャ
 	descRange[2].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-	descRange[2].BaseShaderRegister = 0;		// レジスタ番号
-	descRange[2].NumDescriptors = 1;			// 1回で読む数
+	descRange[2].BaseShaderRegister = 0;	// レジスタ番号
+	descRange[2].NumDescriptors = 1;		// 1回で読む数
 	descRange[2].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 	
 
@@ -524,7 +524,7 @@ void Dx12Wrapper::CreatePmdVertexBuffer()
 
 	pmdVbView.BufferLocation = pmdVertexBuffer->GetGPUVirtualAddress();
 	pmdVbView.StrideInBytes = sizeof(PMDVertexData)-2;	// 頂点1つあたりのバイト数
-	pmdVbView.SizeInBytes = pmdVertexDatas.size();	// データ全体のサイズ
+	pmdVbView.SizeInBytes = pmdVertexDatas.size();		// データ全体のサイズ
 
 	unsigned short* ibuffptr = nullptr;
 	result = pmdIndexBuffer->Map(0, &range, (void**)&ibuffptr);
@@ -533,7 +533,7 @@ void Dx12Wrapper::CreatePmdVertexBuffer()
 
 	pmdIbView.BufferLocation = pmdIndexBuffer->GetGPUVirtualAddress();	// バッファの場所
 	pmdIbView.Format = DXGI_FORMAT_R16_UINT;	// フォーマット(shortなのでR16)
-	pmdIbView.SizeInBytes = pmdFaceVertices.size() * sizeof(pmdFaceVertices[0]);		// 総サイズ
+	pmdIbView.SizeInBytes = pmdFaceVertices.size() * sizeof(pmdFaceVertices[0]);	// 総サイズ
 }
 
 void Dx12Wrapper::InitConstants()
@@ -555,7 +555,7 @@ void Dx12Wrapper::InitConstants()
 	DirectX::XMMATRIX projection = DirectX::XMMatrixPerspectiveFovLH(3.1415f / 2.0f, aspect, 0.5f, 300.0f);		// 射影行列	// LH...LeftHandの略,RHもあるよ
 	DirectX::XMMATRIX lightProj = DirectX::XMMatrixOrthographicLH(30, 30, 0.5f, 300.0f);
 
-	mappedMatrix.viewProj = camera * projection;		// かける順番には気を付けよう
+	mappedMatrix.viewProj = camera * projection;	// かける順番には気を付けよう
 	mappedMatrix.wvp = world * camera * projection;
 
 	auto lightPos = DirectX::XMFLOAT3(50, 70, -15);
@@ -633,6 +633,22 @@ void Dx12Wrapper::InitMaterials()
 
 		auto hptr = dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
+		// テクスチャがなければ、作った白テクスチャを使う。あれば、それを使う
+		auto image = whiteTexBuff;
+		if (strlen(pmdMatDatas[i].textureFileName) > 0)
+		{
+			std::string texFileName = pmdMatDatas[i].textureFileName;
+			size_t dpoint = 0;
+			dpoint = texFileName.rfind(".");		// "."の場所を探る
+
+			auto path = texFileName.substr(dpoint);
+
+			if (path == ".png" || path == ".bmp" || path == ".jpg" || path == ".tga")
+			{
+				image = modelTexBuff[i];
+			}
+		}
+
 		// マテリアルの色
 		dev->CreateConstantBufferView(&cbvDesc, handle);
 		handle.ptr += hptr;
@@ -643,12 +659,8 @@ void Dx12Wrapper::InitMaterials()
 		srvDesc.Texture2D.MipLevels = 1;
 		srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 
-		if (modelTexBuff[i] != nullptr)
-		{
-			srvDesc.Format = modelTexBuff[i]->GetDesc().Format;
-		}
 		// 通常テクスチャ
-		dev->CreateShaderResourceView(modelTexBuff[i], &srvDesc, handle);
+		dev->CreateShaderResourceView(image, &srvDesc, handle);
 		handle.ptr += hptr;
 	}
 }
@@ -664,11 +676,10 @@ void Dx12Wrapper::CreateModelTexture()
 	img.resize(matNum);
 
 
-	for (int i = 0; i < matNum; ++i)
+	for (unsigned int i = 0; i < matNum; ++i)
 	{
 		if (std::strlen(pmdMatDatas[i].textureFileName) == 0)
 		{
-			modelTexBuff[i] = nullptr;
 			// パスがなければ画像はないのでやらなくてよし
 			continue;
 		}
@@ -696,7 +707,31 @@ void Dx12Wrapper::CreateModelTexture()
 		{
 			modelTexBuff[i] = CreateTextureResource(modelTexBuff[i], metadata[i].width, metadata[i].height, metadata[i].arraySize);
 		}
+
+		// テクスチャ書き込み
+		if (path == ".png" || path == ".bmp" || path == ".jpg" || path == ".tga")
+		{
+			result = modelTexBuff[i]->WriteToSubresource(
+				0,
+				nullptr,
+				img[i].GetPixels(),
+				metadata[i].width * 4,
+				img[i].GetPixelsSize());
+		}
+
+		// 書き込んだらもう用はないので解放
+		img[i].Release();
 	}
+}
+
+void Dx12Wrapper::CreateWhiteTexture()
+{
+	whiteTexBuff = CreateTextureResource(whiteTexBuff);
+
+	std::vector<unsigned char> data(4 * 4 * 4);
+	std::fill(data.begin(), data.end(), 0xff);	// 白
+
+	auto result = whiteTexBuff->WriteToSubresource(0, nullptr, data.data(), 4 * 4, 4 * 4 * 4);
 }
 
 std::string Dx12Wrapper::GetModelTexturePath(const std::string& modelpath, const char* texpath)
@@ -754,12 +789,13 @@ Dx12Wrapper::Dx12Wrapper(HWND hwnd)
 
 	std::string modelPath = "model/miku/初音ミク.pmd";
 	Pmd(modelPath);
+
 	CreatePmdVertexBuffer();
 	CreateModelTexture();
+	CreateWhiteTexture();
 	InitMaterials();
 	CreateDepthBuff();
 	
-
 	CreateVertexBuffer();
 
 	InitShader();
@@ -773,6 +809,7 @@ Dx12Wrapper::Dx12Wrapper(HWND hwnd)
 
 Dx12Wrapper::~Dx12Wrapper()
 {
+	rgstDescriptorHeap->Release();
 	cmdAllocator->Release();
 	cmdList->Release();
 	cmdQueue->Release();
@@ -804,6 +841,14 @@ Dx12Wrapper::~Dx12Wrapper()
 	{
 		matBuff->Release();
 	}
+	for (auto& mtexBuff : modelTexBuff)
+	{
+		if (mtexBuff != nullptr)
+		{
+			mtexBuff->Release();
+		}
+	}
+	whiteTexBuff->Release();
 }
 
 void Dx12Wrapper::Update()
@@ -832,6 +877,14 @@ void Dx12Wrapper::Update()
 		if (keyState[VK_LEFT] & 0x80)
 		{
 			pos.x = -0.05f;
+		}
+		if (keyState['Z'] & 0x80)
+		{
+			pos.z = 0.05f;
+		}
+		if (keyState['X'] & 0x80)
+		{
+			pos.z = -0.05f;
 		}
 
 		// 回転
@@ -886,8 +939,6 @@ void Dx12Wrapper::Draw()
 	cmdList->IASetVertexBuffers(0, 1, &pmdVbView);
 	cmdList->IASetIndexBuffer(&pmdIbView);
 
-	//cmdList->DrawInstanced(4, 2, 0, 0);
-	//cmdList->DrawIndexedInstanced(pmdFaceVertices.size(), 1, 0, 0, 0);
 
 	// モデルの描画
 	unsigned int offset = 0;
