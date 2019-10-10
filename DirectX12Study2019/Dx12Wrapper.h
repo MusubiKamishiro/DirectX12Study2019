@@ -4,6 +4,7 @@
 #include <DirectXMath.h>
 
 #include <vector>
+#include <array>
 #include <string>
 
 // PMDのヘッダファイル
@@ -15,7 +16,7 @@ struct PMD
 	char comment[256];	// 製作者コメント
 };
 
-// 頂点データ
+// PMDの頂点データ
 struct PMDVertexData
 {
 	float pos[3];				// x, y, z					// 座標
@@ -26,6 +27,7 @@ struct PMDVertexData
 	unsigned char edgeFlag;		// 0:通常、1:エッジ無効		// エッジ(輪郭)が有効の場合
 };
 
+// PMDのマテリアルデータ
 struct PMDMaterialData
 {
 	DirectX::XMFLOAT3 diffuseColor;	// dr, dg, db	// 減衰色
@@ -40,6 +42,17 @@ struct PMDMaterialData
 	char textureFileName[20];		// テクスチャファイル名
 };
 
+// PMDの骨のデータ
+struct PMDBoneData
+{
+	char boneName[20];					// ボーン名
+	unsigned short parentBoneIndex;		// 親ボーン番号(ない場合は0xFFFF)
+	unsigned short tailPosBoneIndex;	// tail位置のボーン番号(チェーン末端の場合は0xFFFF)	// 親：子は1：多なので、主に位置決め用
+	unsigned char boneType;				// ボーンの種類
+	unsigned short ikParentBoneIndex;	// IKボーン番号(影響IKボーン。ない場合は0)
+	float boneHeadPos[3];				// ボーンのヘッドの位置		// x, y, z
+};
+
 struct Vector3
 {
 	float x, y, z;
@@ -51,10 +64,10 @@ struct Vertex {
 };
 
 struct WVP {
-	DirectX::XMMATRIX world;		// ﾜｰﾙﾄﾞ
-	DirectX::XMMATRIX viewProj;		// ﾋﾞｭｰﾌﾟﾛｼﾞｪｸｼｮﾝ
+	DirectX::XMMATRIX world;		// ワールド
+	DirectX::XMMATRIX viewProj;		// ビュープロジェクション
 	DirectX::XMMATRIX wvp;			// 合成済み
-	DirectX::XMMATRIX lightVP;		// ﾗｲﾄﾋﾞｭｰﾌﾟﾛｼﾞｪｸｼｮﾝ
+	DirectX::XMMATRIX lightVP;		// ライトビュープロジェクション
 };
 
 
@@ -155,11 +168,14 @@ private:
 	std::pair<std::string, std::string> SplitFileName(const std::string& path, const char splitter = '*');
 
 	// PMD関連
+	std::string modelPath;	// モデルのパス
 	//@param	モデルのパス
 	void Pmd(std::string& filepath);
-	std::vector<char> pmdVertexDatas;	// PMD頂点データ
+	std::vector<char> pmdVertexDatas;			// PMD頂点データ
 	std::vector<unsigned short> pmdFaceVertices;// PMD面頂点データ
 	std::vector<PMDMaterialData> pmdMatDatas;	// PMDマテリアルデータ
+	std::vector<PMDBoneData> pmdBones;			// PMDの骨
+	std::array<char[100], 10> toonTexNames;		// トゥーンテクスチャの名前, 固定
 	// 頂点バッファの作成
 	void CreatePmdVertexBuffer();
 	ID3D12Resource* pmdVertexBuffer = nullptr;	// PMD用頂点バッファ
@@ -175,13 +191,21 @@ private:
 	std::vector<ID3D12Resource*> modelTexBuff;	// 通常テクスチャ
 	std::vector<ID3D12Resource*> spaBuff;		// 加算テクスチャ
 	std::vector<ID3D12Resource*> sphBuff;		// 乗算テクスチャ
-	//std::vector<ID3D12Resource*> toonBuff;		// トゥーンテクスチャ
 	// 白テクスチャ作成
 	void CreateWhiteTexture();
 	ID3D12Resource* whiteTexBuff;
 	// 黒テクスチャ作成
 	void CreateBlackTexture();
 	ID3D12Resource* blackTexBuff;
+	// トゥーンがなかった時に使用するテクスチャ作成
+	void CreateGraduationTextureBuffer();
+	ID3D12Resource* gradTexBuff;				// グラデーションテクスチャ
+	// トゥーンテクスチャ作成
+	void CreateToonTexture();
+	std::vector<ID3D12Resource*> toonBuff;		// トゥーンテクスチャ
+	// インデックスを元にトゥーンのパスをもらう
+	std::string GetToonPathFromIndex(const std::string& folder, int idx);
+
 	// モデルのテクスチャのパスを獲得
 	std::string GetModelTexturePath(const std::string& modelpath, const char* texpath);
 	std::vector<std::string> modelTexturesPath;	// モデルに張り付けるテクスチャのパス(中身がないときもある)

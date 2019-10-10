@@ -2,6 +2,7 @@
 #include <d3dcompiler.h>
 #include <DirectXTex.h>
 #include "d3dx12.h"
+#include "shlwapi.h"
 
 #include "Application.h"
 
@@ -9,6 +10,7 @@
 #pragma comment(lib,"dxgi.lib")
 #pragma comment(lib, "d3dcompiler.lib")
 #pragma comment(lib, "DirectXTex.lib")
+#pragma comment(lib, "shlwapi.lib")
 
 
 void Dx12Wrapper::CreateDebugLayer()
@@ -212,10 +214,10 @@ void Dx12Wrapper::InitRootSignatur()
 	descRange[1].NumDescriptors = 1;		// 1回で読む数
 	descRange[1].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 	// "t0" マテリアルにはるテクスチャ
-	// 通常テクスチャ, 加算テクスチャ, 乗算テクスチャを一括で読む
+	// 通常テクスチャ, 加算テクスチャ, 乗算テクスチャ, トゥーンテクスチャを一括で読む
 	descRange[2].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
 	descRange[2].BaseShaderRegister = 0;	// レジスタ番号
-	descRange[2].NumDescriptors = 3;		// 1回で読む数
+	descRange[2].NumDescriptors = 4;		// 1回で読む数
 	descRange[2].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 	
 
@@ -502,6 +504,81 @@ void Dx12Wrapper::Pmd(std::string& filepath)
 			modelTexturesPath[i] = GetModelTexturePath(filepath, pmdMatDatas[i].textureFileName);
 		}
 	}
+
+	// 骨数読み込み
+	unsigned short boneCount = 0;
+	fread(&boneCount, sizeof(boneCount), 1, fp);
+	// 骨読み込み
+	pmdBones.resize(boneCount);
+	for (auto& pmdBone : pmdBones)
+	{
+		fread(&pmdBone.boneName,			sizeof(pmdBone.boneName),			1, fp);
+		fread(&pmdBone.parentBoneIndex,		sizeof(pmdBone.parentBoneIndex),	1, fp);
+		fread(&pmdBone.tailPosBoneIndex,	sizeof(pmdBone.tailPosBoneIndex),	1, fp);
+		fread(&pmdBone.boneType,			sizeof(pmdBone.boneType),			1, fp);
+		fread(&pmdBone.ikParentBoneIndex,	sizeof(pmdBone.ikParentBoneIndex),	1, fp);
+		fread(&pmdBone.boneHeadPos,			sizeof(pmdBone.boneHeadPos),		1, fp);
+	}
+
+	// IK数読み込み
+	unsigned short ikNum = 0;
+	fread(&ikNum, sizeof(ikNum), 1, fp);
+	// IK読み込み(今は省略)
+	for (int i = 0; i < ikNum; ++i)
+	{
+		fseek(fp, 4, SEEK_CUR);
+		unsigned char ikChainNum = 0;
+		fread(&ikChainNum, sizeof(ikChainNum), 1, fp);
+		fseek(fp, 6, SEEK_CUR);
+		fseek(fp, ikChainNum * sizeof(unsigned short), SEEK_CUR);
+	}
+
+	// 表情数読み込み
+	unsigned short skinNum = 0;
+	fread(&skinNum, sizeof(skinNum), 1, fp);
+	// 表情読み込み(今は省略)
+	for (int i = 0; i < skinNum; ++i)
+	{
+		fseek(fp, 20, SEEK_CUR);
+		unsigned int vertNum = 0;
+		fread(&vertNum, sizeof(vertNum), 1, fp);
+		fseek(fp, 1, SEEK_CUR);
+		fseek(fp, 16 * vertNum, SEEK_CUR);
+	}
+
+	// 表示用表情(今は省略)
+	unsigned char skinDispNum = 0;
+	fread(&skinDispNum, sizeof(skinDispNum), 1, fp);
+	fseek(fp, skinDispNum * sizeof(unsigned short), SEEK_CUR);
+
+	// 表示用ボーン名(今は省略)
+	unsigned char boneDispNum = 0;
+	fread(&boneDispNum, sizeof(boneDispNum), 1, fp);
+	fseek(fp, 50 * boneDispNum, SEEK_CUR);
+
+	// 表示ボーンリスト(今は省略)
+	unsigned int dispBoneNum = 0;
+	fread(&dispBoneNum, sizeof(dispBoneNum), 1, fp);
+	fseek(fp, 3 * dispBoneNum, SEEK_CUR);
+
+	// 英名
+	// 英名対応フラグ(今は省略)
+	unsigned char englishFlg = 0;
+	fread(&englishFlg, sizeof(englishFlg), 1, fp);
+	if (englishFlg)
+	{
+		// モデル名20バイト+256バイトコメント
+		fseek(fp, 20 + 256, SEEK_CUR);
+		// ボーン名20バイト*ボーン数
+		fseek(fp, boneCount * 20, SEEK_CUR);
+		// (表情数-1)*20バイト。-1なのはベース部分ぶん
+		fseek(fp, (skinNum - 1) * 20, SEEK_CUR);
+		// ボーン数*50バイト
+		fseek(fp, boneDispNum * 50, SEEK_CUR);
+	}
+
+	// トゥーン名読み込み
+	fread(toonTexNames.data(), sizeof(char) * 100, toonTexNames.size(), fp);
 	
 	fclose(fp);
 }
@@ -609,7 +686,7 @@ void Dx12Wrapper::InitMaterials()
 	D3D12_DESCRIPTOR_HEAP_DESC descHeapDesc = {};
 	descHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 	descHeapDesc.NodeMask = 0;
-	descHeapDesc.NumDescriptors = materialBuffs.size() * 4;
+	descHeapDesc.NumDescriptors = materialBuffs.size() * 5;
 	descHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 
 	// ヒープ作成
@@ -656,7 +733,24 @@ void Dx12Wrapper::InitMaterials()
 		auto sph = whiteTexBuff;
 		if (strlen(modelTexturesPath[i].c_str()) > 0)
 		{
-			auto ext = GetExtension(modelTexturesPath[i].c_str());
+			// とりあえず目が見たいから仮実装
+			std::string texFileName = modelTexturesPath[i];
+			if (count(texFileName.begin(), texFileName.end(), '*') > 0)
+			{
+				auto namepair = SplitFileName(texFileName);
+				if (GetExtension(namepair.first.c_str()) == "sph" || GetExtension(namepair.first.c_str()) == "spa")
+				{
+					texFileName = namepair.second;
+				}
+				else
+				{
+					texFileName = namepair.first;
+				}
+			}
+			auto ext = GetExtension(texFileName.c_str());
+			// ここまで仮実装
+
+			//auto ext = GetExtension(modelTexturesPath[i].c_str());
 
 			if (ext == "png" || ext == "bmp" || ext == "jpg" || ext == "tga")
 			{
@@ -670,6 +764,13 @@ void Dx12Wrapper::InitMaterials()
 			{
 				sph = sphBuff[i];
 			}
+		}
+
+		// トゥーンがあればそれを、なければデフォルトを使う
+		auto toon = gradTexBuff;
+		if (pmdMatDatas[i].toonIndex != 0xff)
+		{
+			toon = toonBuff[pmdMatDatas[i].toonIndex];
 		}
 
 		// マテリアルの色
@@ -692,6 +793,10 @@ void Dx12Wrapper::InitMaterials()
 
 		// 乗算(sph)
 		dev->CreateShaderResourceView(sph, &srvDesc, handle);
+		handle.ptr += hptr;
+
+		// トゥーン(toon)
+		dev->CreateShaderResourceView(toon, &srvDesc, handle);
 		handle.ptr += hptr;
 	}
 }
@@ -830,6 +935,83 @@ void Dx12Wrapper::CreateBlackTexture()
 	auto result = blackTexBuff->WriteToSubresource(0, nullptr, data.data(), 4 * 4, 4 * 4 * 4);
 }
 
+void Dx12Wrapper::CreateGraduationTextureBuffer()
+{
+	gradTexBuff = CreateTextureResource(gradTexBuff);
+
+	struct Color
+	{
+		Color() : r(0), g(0), b(0), a(0) {}
+		Color(unsigned char inr, unsigned char ing, unsigned char inb, unsigned char ina)
+			: r(inr), g(ing), b(inb), a(ina) {}
+
+		unsigned char r, g, b, a;
+	};
+
+	std::vector<Color> data;
+	data.resize(4 * 256);
+	unsigned char brightness = 255;
+	for (auto it = data.begin(); it != data.end(); it += 4)
+	{
+		std::fill_n(it, 4, Color(brightness, brightness, brightness, 0xff));
+		--brightness;
+	}
+
+	auto result = gradTexBuff->WriteToSubresource(0, nullptr, data.data(), 4 * sizeof(Color), data.size() * sizeof(Color));
+}
+
+void Dx12Wrapper::CreateToonTexture()
+{
+	std::vector<DirectX::TexMetadata> metadata = {};
+	std::vector<DirectX::ScratchImage> toon;
+
+	toonBuff.resize(10);
+	metadata.resize(10);
+	toon.resize(10);
+
+	// トゥーン読み込み&書き込み
+	for (int i = 0; i < toon.size(); i++)
+	{
+		size_t spoint = modelPath.rfind("/");		// "/"の場所を探る
+		std::string modelToon = modelPath.substr(0, spoint + 1);
+		std::string s = GetToonPathFromIndex(modelToon, i);
+		auto path = GetWideStringFromString(s);
+		
+		// 読み込み
+		auto result = DirectX::LoadFromWICFile(path.c_str(), DirectX::WIC_FLAGS_NONE, &metadata[i], toon[i]);
+
+		toonBuff[i] = CreateTextureResource(toonBuff[i], metadata[i].width, metadata[i].height, metadata[i].arraySize);
+
+		// テクスチャ書き込み
+		result = toonBuff[i]->WriteToSubresource(
+			0,
+			nullptr,
+			toon[i].GetPixels(),
+			metadata[i].width * 4,
+			toon[i].GetPixelsSize());
+
+		// 書き込んだら用済みなので解放
+		toon[i].Release();
+	}
+}
+
+std::string Dx12Wrapper::GetToonPathFromIndex(const std::string& folder, int idx)
+{
+	std::string filename = toonTexNames[idx];
+	std::string path = "toon/";
+	path += filename;
+
+	// ファイルシステムオブジェクトへのパスが有効かどうかを判断する
+	if (PathFileExistsA(path.c_str()))
+	{
+		return path;
+	}
+	else
+	{
+		return folder + filename;
+	}
+}
+
 std::string Dx12Wrapper::GetModelTexturePath(const std::string& modelpath, const char* texpath)
 {
 	auto spoint = modelpath.rfind("/");		// "/"を逆から探索 
@@ -883,14 +1065,19 @@ Dx12Wrapper::Dx12Wrapper(HWND hwnd)
 
 	result = dev->CreateDescriptorHeap(&descHeapDesc, IID_PPV_ARGS(&rgstDescriptorHeap));
 
-	//std::string modelPath = "model/vocaloid/初音ミク.pmd";
-	std::string modelPath = "model/vocaloid/巡音ルカ.pmd";
+	//modelPath = "model/vocaloid/初音ミク.pmd";
+	modelPath = "model/vocaloid/初音ミクmetal.pmd";
+	//modelPath = "model/vocaloid/巡音ルカ.pmd";
+	//modelPath = "model/yayoi/やよいヘッド_カジュアル（体x0.96）改造.pmd";
+	//modelPath = "model/hibiki/我那覇響v1.pmd";
 	Pmd(modelPath);
 
 	CreatePmdVertexBuffer();
 	CreateModelTexture();
 	CreateWhiteTexture();
 	CreateBlackTexture();
+	CreateGraduationTextureBuffer();
+	CreateToonTexture();
 	InitMaterials();
 	CreateDepthBuff();
 	
@@ -953,6 +1140,11 @@ Dx12Wrapper::~Dx12Wrapper()
 	}
 	whiteTexBuff->Release();
 	blackTexBuff->Release();
+	gradTexBuff->Release();
+	for (auto& toon : toonBuff)
+	{
+		toon->Release();
+	}
 }
 
 void Dx12Wrapper::Update()
@@ -1052,7 +1244,7 @@ void Dx12Wrapper::Draw()
 	for (auto& mat : pmdMatDatas)
 	{
 		cmdList->SetGraphicsRootDescriptorTable(1, handle);
-		handle.ptr += hptr * 4;
+		handle.ptr += hptr * 5;
 		cmdList->DrawIndexedInstanced(mat.faceVertCount, 1, offset, 0, 0);
 		offset += mat.faceVertCount;
 	}

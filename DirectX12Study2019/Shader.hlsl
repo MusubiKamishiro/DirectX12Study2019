@@ -1,5 +1,11 @@
-// テクスチャ(0番)
+// テクスチャ(0番)	// 通常
 Texture2D<float4> tex	: register(t0);
+// テクスチャ(1番)	// 加算
+Texture2D<float4> spa	: register(t1);
+// テクスチャ(2番)	// 乗算
+Texture2D<float4> sph	: register(t2);
+// テクスチャ(3番)	// トゥーン
+Texture2D<float4> toon	: register(t3);
 // サンプラ(0番)
 SamplerState smp : register(s0);
 // 定数バッファ(0番)
@@ -22,10 +28,10 @@ cbuffer material : register(b1)
 
 struct Output
 {
-	float4 pos			: POSITION;
-	float4 svpos		: SV_POSITION;
-	float4 normal		: NORMAL;
-	float2 uv			: TEXCOORD;
+	float4 pos		: POSITION;		// システム用頂点座標
+	float4 svpos	: SV_POSITION;	// システム用頂点座標
+	float4 normal	: NORMAL;		// 法線ベクトル
+	float2 uv		: TEXCOORD;		// UV値
 };
 
 // 頂点シェーダ
@@ -45,16 +51,23 @@ Output vs(float4 pos : POSITION, float4 normal : NORMAL, float2 uv : TEXCOORD)
 // ピクセルシェーダ
 float4 ps(Output output) : SV_TARGET
 {
-	//return float4(1.0f, float2(output.uv), 1.0f);
-	//return float4(tex.Sample(smp, output.uv).rgb, 1.0f);
-	//return float4(1.0f, 1.0f, 1.0f, 1.0f);
+	// 座標系をあわせている
+	float2 spuv = ((float2(1, -1) + output.normal.xy) * float2(0.5f, -0.5f));
 
-	//return float4(float3(output.normal.rgb), 1.0f);
-
-	float3 light = float3(-1, 1, -1);
+	float3 light = float3(-1, 1, -1);	// 平行光線ベクトル
 	light = normalize(light);
+	//光の反射ベクトル
+	float3 refLight = normalize(reflect(light, output.normal.rgb));
+	//float specularB = pow(saturate(dot(refLight, -input.ray)), specular.a);
 
-	float3 matcolor = diffuse * tex.Sample(smp, output.uv).rgb /*+ specular + (mirror * 0.6f)*/;
 	float brightness = dot(light, output.normal);
-	return float4(matcolor * brightness, 1.0);
+	float4 toonDif = toon.Sample(smp, float2(0, 1.0f - brightness));
+
+	float3 texColor = tex.Sample(smp, output.uv);
+	float3 matColor = toonDif.rgb * diffuse + specular + (mirror * 0.5f);
+
+	return float4(float3(brightness, brightness, brightness) * texColor * diffuse
+		* tex.Sample(smp, output.uv).rgb * sph.Sample(smp, spuv).rgb + spa.Sample(smp, spuv).rgb + float3(texColor * mirror), 1.0f);
+
+	return float4(texColor * matColor * float3(brightness, brightness, brightness), 1.0f);
 }
