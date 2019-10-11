@@ -128,12 +128,16 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Application.cpp" />
+    <ClCompile Include="Dx12View.cpp" />
     <ClCompile Include="Dx12Wrapper.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="PMDLoader.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Application.h" />
+    <ClInclude Include="Dx12View.h" />
     <ClInclude Include="Dx12Wrapper.h" />
+    <ClInclude Include="PMDLoader.h" />
     <ClInclude Include="resource.h" />
   </ItemGroup>
   <ItemGroup>

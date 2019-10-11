@@ -6,52 +6,10 @@
 #include <vector>
 #include <array>
 #include <string>
+#include <memory>
 
-// PMDのヘッダファイル
-struct PMD
-{
-	char magic[3];		// "Pmd"
-	float version;		// バージョン
-	char modelName[20];	// モデルの名前
-	char comment[256];	// 製作者コメント
-};
+class PMDLoader;
 
-// PMDの頂点データ
-struct PMDVertexData
-{
-	float pos[3];				// x, y, z					// 座標
-	float normalVec[3];			// nx, ny, nz				// 法線ベクトル
-	float uv[2];				// u, v						// UV座標			// MMDは頂点UV
-	unsigned short boneNum[2];	// ボーン番号1、番号2		// モデル変形(頂点移動)時に影響
-	unsigned char boneWeight;	// ボーン1に与える影響度	// min:0 max:100	// ボーン2への影響度は、(100 - bone_weight)
-	unsigned char edgeFlag;		// 0:通常、1:エッジ無効		// エッジ(輪郭)が有効の場合
-};
-
-// PMDのマテリアルデータ
-struct PMDMaterialData
-{
-	DirectX::XMFLOAT3 diffuseColor;	// dr, dg, db	// 減衰色
-	float alpha;					// 減衰色の不透明度
-	float specularity;				// スペキュラ乗算(スペキュラの鋭さ)
-	DirectX::XMFLOAT3 specularColor;// sr, sg, sb	// 光沢色
-	DirectX::XMFLOAT3 mirrorColor;	// mr, mg, mb	// 環境色(ambient)
-	unsigned char toonIndex;		// toon??.bmp	// トゥーン
-	unsigned char edgeFlag;			// 輪郭,影
-	// パディング2個が予想される...ここまでで46バイト
-	unsigned int faceVertCount;		// 面頂点数
-	char textureFileName[20];		// テクスチャファイル名
-};
-
-// PMDの骨のデータ
-struct PMDBoneData
-{
-	char boneName[20];					// ボーン名
-	unsigned short parentBoneIndex;		// 親ボーン番号(ない場合は0xFFFF)
-	unsigned short tailPosBoneIndex;	// tail位置のボーン番号(チェーン末端の場合は0xFFFF)	// 親：子は1：多なので、主に位置決め用
-	unsigned char boneType;				// ボーンの種類
-	unsigned short ikParentBoneIndex;	// IKボーン番号(影響IKボーン。ない場合は0)
-	float boneHeadPos[3];				// ボーンのヘッドの位置		// x, y, z
-};
 
 struct Vector3
 {
@@ -59,6 +17,9 @@ struct Vector3
 };
 
 struct Vertex {
+	Vertex() {};
+	Vertex(DirectX::XMFLOAT3 _pos, DirectX::XMFLOAT2 _uv) : pos(_pos), uv(_uv) {};
+
 	DirectX::XMFLOAT3 pos;	// 座標
 	DirectX::XMFLOAT2 uv;	// UV座標
 };
@@ -74,6 +35,8 @@ struct WVP {
 class Dx12Wrapper
 {
 private:
+	// 
+	ID3D12DescriptorHeap* rgstDescriptorHeap = nullptr;
 	// 基本的な奴(DXGI)
 	IDXGIFactory6* dxgiFactory = nullptr;
 	IDXGISwapChain4* swapChain = nullptr;	// スワップチェイン
@@ -121,7 +84,8 @@ private:
 	ID3D12Resource* depthBuff = nullptr;
 	ID3D12DescriptorHeap* dsvHeap = nullptr;
 
-	void InitConstants();	// 定数バッファの初期化
+	// 定数バッファの初期化
+	void InitConstants();
 	ID3D12Resource* constBuff = nullptr;	// 定数バッファ
 	WVP* m = nullptr;
 	WVP mappedMatrix;
@@ -152,9 +116,6 @@ private:
 	
 	D3D12_RESOURCE_BARRIER BarrierDesc = {};	// バリア
 
-	///ここから一時的な試験のための物
-	///確認が終わり次第削除すること
-	ID3D12DescriptorHeap* rgstDescriptorHeap = nullptr;
 
 	// 拡張子を取得する
 	//@param path 対象パスの文字列
@@ -169,13 +130,9 @@ private:
 
 	// PMD関連
 	std::string modelPath;	// モデルのパス
-	//@param	モデルのパス
-	void Pmd(std::string& filepath);
-	std::vector<char> pmdVertexDatas;			// PMD頂点データ
-	std::vector<unsigned short> pmdFaceVertices;// PMD面頂点データ
-	std::vector<PMDMaterialData> pmdMatDatas;	// PMDマテリアルデータ
-	std::vector<PMDBoneData> pmdBones;			// PMDの骨
-	std::array<char[100], 10> toonTexNames;		// トゥーンテクスチャの名前, 固定
+	// PMDを読み込み
+	std::shared_ptr<PMDLoader> pmdLoader;
+	
 	// 頂点バッファの作成
 	void CreatePmdVertexBuffer();
 	ID3D12Resource* pmdVertexBuffer = nullptr;	// PMD用頂点バッファ
@@ -206,9 +163,6 @@ private:
 	// インデックスを元にトゥーンのパスをもらう
 	std::string GetToonPathFromIndex(const std::string& folder, int idx);
 
-	// モデルのテクスチャのパスを獲得
-	std::string GetModelTexturePath(const std::string& modelpath, const char* texpath);
-	std::vector<std::string> modelTexturesPath;	// モデルに張り付けるテクスチャのパス(中身がないときもある)
 	// string(マルチバイト文字列)からwstring(ワイド文字列)を得る
 	//@param str マルチバイト文字列
 	//@return 変換されたワイド文字列

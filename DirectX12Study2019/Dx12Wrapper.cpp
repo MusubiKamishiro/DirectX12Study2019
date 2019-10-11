@@ -5,6 +5,7 @@
 #include "shlwapi.h"
 
 #include "Application.h"
+#include "PMDLoader.h"
 
 #pragma comment(lib,"d3d12.lib")
 #pragma comment(lib,"dxgi.lib")
@@ -125,12 +126,12 @@ void Dx12Wrapper::CreateRenderTarget()
 
 void Dx12Wrapper::CreateVertexBuffer()
 {
-	Vertex vertices[] = {
-		DirectX::XMFLOAT3(-0.8f, -0.8f, 0.0f), DirectX::XMFLOAT2(0.0f, 1.0f),	// 左下
-		DirectX::XMFLOAT3(-0.8f, 0.8f, 0.0f), DirectX::XMFLOAT2(0.0f, 0.0f),	// 左上
-		DirectX::XMFLOAT3(0.8f, -0.8f, 0.0f), DirectX::XMFLOAT2(1.0f, 1.0f),	// 右上
-		DirectX::XMFLOAT3(0.8f, 0.8f, 0.0f), DirectX::XMFLOAT2(1.0f, 0.0f),		// 右下
-	};
+	std::vector<Vertex> vertices;
+	vertices.resize(4);
+	vertices.emplace_back(DirectX::XMFLOAT3(-0.8f, -0.8f, 0.0f), DirectX::XMFLOAT2(0.0f, 1.0f));	// 左下
+	vertices.emplace_back(DirectX::XMFLOAT3(-0.8f, 0.8f, 0.0f), DirectX::XMFLOAT2(0.0f, 0.0f));		// 左上
+	vertices.emplace_back(DirectX::XMFLOAT3(0.8f, -0.8f, 0.0f), DirectX::XMFLOAT2(1.0f, 1.0f));		// 右上
+	vertices.emplace_back(DirectX::XMFLOAT3(0.8f, 0.8f, 0.0f), DirectX::XMFLOAT2(1.0f, 0.0f));		// 右下
 
 	D3D12_HEAP_PROPERTIES heapprop = {};
 	heapprop.Type = D3D12_HEAP_TYPE_UPLOAD;
@@ -139,7 +140,7 @@ void Dx12Wrapper::CreateVertexBuffer()
 
 	D3D12_RESOURCE_DESC resdesc = {};
 	resdesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-	resdesc.Width = sizeof(vertices);	// 頂点情報が入るだけのサイズ
+	resdesc.Width = vertices.size();	// 頂点情報が入るだけのサイズ
 	resdesc.Height = 1;
 	resdesc.DepthOrArraySize = 1;
 	resdesc.MipLevels = 1;
@@ -172,7 +173,6 @@ void Dx12Wrapper::CreateVertexBuffer()
 	ibView.Format = DXGI_FORMAT_R16_UINT;	// フォーマット(shortなのでR16)
 	ibView.SizeInBytes = indices.size() * sizeof(indices[0]);		// 総サイズ
 }
-
 
 void Dx12Wrapper::InitShader()
 {
@@ -451,138 +451,6 @@ std::pair<std::string, std::string> Dx12Wrapper::SplitFileName(const std::string
 	return ret;
 }
 
-void Dx12Wrapper::Pmd(std::string& filepath)
-{
-	// モデルの読み込み
-	FILE* fp;
-	errno_t error;
-	error = fopen_s(&fp, filepath.c_str(), "rb");	
-
-	assert(error == 0);	// 読み込めなかった場合警告を吐く
-	
-	// ヘッダ読み込み
-	PMD pmdData;
-	fread(&pmdData.magic, sizeof(pmdData.magic), 1, fp);
-	fread(&pmdData.version, sizeof(pmdData.version), 1, fp);
-	fread(&pmdData.modelName, sizeof(pmdData.modelName), 1, fp);
-	fread(&pmdData.comment, sizeof(pmdData.comment), 1, fp);
-
-	// 頂点数読み込み
-	unsigned int vertexCount;
-	fread(&vertexCount, sizeof(vertexCount), 1, fp);
-	// 頂点の数だけ頂点リスト読み込み
-	pmdVertexDatas.resize(vertexCount * (sizeof(PMDVertexData)-2));
-	fread(pmdVertexDatas.data(), pmdVertexDatas.size(), 1, fp);
-
-	// 面頂点数読み込み
-	unsigned int faceVertexCount;
-	fread(&faceVertexCount, sizeof(faceVertexCount), 1, fp);
-	// 面頂点リスト読み込み
-	pmdFaceVertices.resize(faceVertexCount);
-	fread(pmdFaceVertices.data(), pmdFaceVertices.size() * sizeof(unsigned short), 1, fp);
-
-	// マテリアル数読み込み
-	unsigned int matCount;
-	fread(&matCount, sizeof(matCount), 1, fp);
-	// マテリアル読み込み
-	pmdMatDatas.resize(matCount);
-	modelTexturesPath.resize(matCount);
-	for(int i = 0; i < pmdMatDatas.size(); ++i)
-	{
-		fread(&pmdMatDatas[i].diffuseColor,		sizeof(pmdMatDatas[i].diffuseColor),	1, fp);
-		fread(&pmdMatDatas[i].alpha,			sizeof(pmdMatDatas[i].alpha),			1, fp);
-		fread(&pmdMatDatas[i].specularity,		sizeof(pmdMatDatas[i].specularity),		1, fp);
-		fread(&pmdMatDatas[i].specularColor,	sizeof(pmdMatDatas[i].specularColor),	1, fp);
-		fread(&pmdMatDatas[i].mirrorColor,		sizeof(pmdMatDatas[i].mirrorColor),		1, fp);
-		fread(&pmdMatDatas[i].toonIndex,		sizeof(pmdMatDatas[i].toonIndex),		1, fp);
-		fread(&pmdMatDatas[i].edgeFlag,			sizeof(pmdMatDatas[i].edgeFlag),		1, fp);
-		fread(&pmdMatDatas[i].faceVertCount,	sizeof(pmdMatDatas[i].faceVertCount),	1, fp);
-		fread(&pmdMatDatas[i].textureFileName,	sizeof(pmdMatDatas[i].textureFileName),	1, fp);
-
-		if (std::strlen(pmdMatDatas[i].textureFileName) > 0)
-		{
-			modelTexturesPath[i] = GetModelTexturePath(filepath, pmdMatDatas[i].textureFileName);
-		}
-	}
-
-	// 骨数読み込み
-	unsigned short boneCount = 0;
-	fread(&boneCount, sizeof(boneCount), 1, fp);
-	// 骨読み込み
-	pmdBones.resize(boneCount);
-	for (auto& pmdBone : pmdBones)
-	{
-		fread(&pmdBone.boneName,			sizeof(pmdBone.boneName),			1, fp);
-		fread(&pmdBone.parentBoneIndex,		sizeof(pmdBone.parentBoneIndex),	1, fp);
-		fread(&pmdBone.tailPosBoneIndex,	sizeof(pmdBone.tailPosBoneIndex),	1, fp);
-		fread(&pmdBone.boneType,			sizeof(pmdBone.boneType),			1, fp);
-		fread(&pmdBone.ikParentBoneIndex,	sizeof(pmdBone.ikParentBoneIndex),	1, fp);
-		fread(&pmdBone.boneHeadPos,			sizeof(pmdBone.boneHeadPos),		1, fp);
-	}
-
-	// IK数読み込み
-	unsigned short ikNum = 0;
-	fread(&ikNum, sizeof(ikNum), 1, fp);
-	// IK読み込み(今は省略)
-	for (int i = 0; i < ikNum; ++i)
-	{
-		fseek(fp, 4, SEEK_CUR);
-		unsigned char ikChainNum = 0;
-		fread(&ikChainNum, sizeof(ikChainNum), 1, fp);
-		fseek(fp, 6, SEEK_CUR);
-		fseek(fp, ikChainNum * sizeof(unsigned short), SEEK_CUR);
-	}
-
-	// 表情数読み込み
-	unsigned short skinNum = 0;
-	fread(&skinNum, sizeof(skinNum), 1, fp);
-	// 表情読み込み(今は省略)
-	for (int i = 0; i < skinNum; ++i)
-	{
-		fseek(fp, 20, SEEK_CUR);
-		unsigned int vertNum = 0;
-		fread(&vertNum, sizeof(vertNum), 1, fp);
-		fseek(fp, 1, SEEK_CUR);
-		fseek(fp, 16 * vertNum, SEEK_CUR);
-	}
-
-	// 表示用表情(今は省略)
-	unsigned char skinDispNum = 0;
-	fread(&skinDispNum, sizeof(skinDispNum), 1, fp);
-	fseek(fp, skinDispNum * sizeof(unsigned short), SEEK_CUR);
-
-	// 表示用ボーン名(今は省略)
-	unsigned char boneDispNum = 0;
-	fread(&boneDispNum, sizeof(boneDispNum), 1, fp);
-	fseek(fp, 50 * boneDispNum, SEEK_CUR);
-
-	// 表示ボーンリスト(今は省略)
-	unsigned int dispBoneNum = 0;
-	fread(&dispBoneNum, sizeof(dispBoneNum), 1, fp);
-	fseek(fp, 3 * dispBoneNum, SEEK_CUR);
-
-	// 英名
-	// 英名対応フラグ(今は省略)
-	unsigned char englishFlg = 0;
-	fread(&englishFlg, sizeof(englishFlg), 1, fp);
-	if (englishFlg)
-	{
-		// モデル名20バイト+256バイトコメント
-		fseek(fp, 20 + 256, SEEK_CUR);
-		// ボーン名20バイト*ボーン数
-		fseek(fp, boneCount * 20, SEEK_CUR);
-		// (表情数-1)*20バイト。-1なのはベース部分ぶん
-		fseek(fp, (skinNum - 1) * 20, SEEK_CUR);
-		// ボーン数*50バイト
-		fseek(fp, boneDispNum * 50, SEEK_CUR);
-	}
-
-	// トゥーン名読み込み
-	fread(toonTexNames.data(), sizeof(char) * 100, toonTexNames.size(), fp);
-	
-	fclose(fp);
-}
-
 void Dx12Wrapper::CreatePmdVertexBuffer()
 {
 	D3D12_HEAP_PROPERTIES heapprop = {};
@@ -592,7 +460,7 @@ void Dx12Wrapper::CreatePmdVertexBuffer()
 
 	D3D12_RESOURCE_DESC resdesc = {};
 	resdesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-	resdesc.Width = pmdVertexDatas.size();	// 頂点情報が入るだけのサイズ
+	resdesc.Width = pmdLoader->GetVertexDatas().size();	// 頂点情報が入るだけのサイズ
 	resdesc.Height = 1;
 	resdesc.DepthOrArraySize = 1;
 	resdesc.MipLevels = 1;
@@ -607,27 +475,27 @@ void Dx12Wrapper::CreatePmdVertexBuffer()
 
 	// インデックスバッファの作成
 	result = dev->CreateCommittedResource(&heapprop, D3D12_HEAP_FLAG_NONE,
-		&CD3DX12_RESOURCE_DESC::Buffer(pmdFaceVertices.size() * sizeof(pmdFaceVertices[0])),
+		&CD3DX12_RESOURCE_DESC::Buffer(pmdLoader->GetFaceVertices().size() * sizeof(pmdLoader->GetFaceVertices()[0])),
 		D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&pmdIndexBuffer));
 
 	D3D12_RANGE range = { 0,0 };
 	char* vertexMap = nullptr;
 	result = pmdVertexBuffer->Map(0, &range, (void**)&vertexMap);
-	std::copy(pmdVertexDatas.begin(), pmdVertexDatas.end(), vertexMap);
+	std::copy(pmdLoader->GetVertexDatas().begin(), pmdLoader->GetVertexDatas().end(), vertexMap);
 	pmdVertexBuffer->Unmap(0, nullptr);
 
 	pmdVbView.BufferLocation = pmdVertexBuffer->GetGPUVirtualAddress();
 	pmdVbView.StrideInBytes = sizeof(PMDVertexData)-2;	// 頂点1つあたりのバイト数
-	pmdVbView.SizeInBytes = pmdVertexDatas.size();		// データ全体のサイズ
+	pmdVbView.SizeInBytes = pmdLoader->GetVertexDatas().size();		// データ全体のサイズ
 
 	unsigned short* ibuffptr = nullptr;
 	result = pmdIndexBuffer->Map(0, &range, (void**)&ibuffptr);
-	std::copy(pmdFaceVertices.begin(), pmdFaceVertices.end(), ibuffptr);
+	std::copy(pmdLoader->GetFaceVertices().begin(), pmdLoader->GetFaceVertices().end(), ibuffptr);
 	pmdIndexBuffer->Unmap(0, nullptr);
 
 	pmdIbView.BufferLocation = pmdIndexBuffer->GetGPUVirtualAddress();	// バッファの場所
 	pmdIbView.Format = DXGI_FORMAT_R16_UINT;	// フォーマット(shortなのでR16)
-	pmdIbView.SizeInBytes = pmdFaceVertices.size() * sizeof(pmdFaceVertices[0]);	// 総サイズ
+	pmdIbView.SizeInBytes = pmdLoader->GetFaceVertices().size() * sizeof(pmdLoader->GetFaceVertices()[0]);	// 総サイズ
 }
 
 void Dx12Wrapper::InitConstants()
@@ -680,7 +548,7 @@ void Dx12Wrapper::InitConstants()
 void Dx12Wrapper::InitMaterials()
 {
 	// バッファのリサイズ
-	materialBuffs.resize(pmdMatDatas.size());
+	materialBuffs.resize(pmdLoader->GetMatDatas().size());
 
 	// ヒープの設定
 	D3D12_DESCRIPTOR_HEAP_DESC descHeapDesc = {};
@@ -717,9 +585,9 @@ void Dx12Wrapper::InitMaterials()
 		// マップする
 		result = materialBuffs[i]->Map(0, nullptr, (void**)& matMap);
 		// 着色
-		matMap->diffuseColor = pmdMatDatas[i].diffuseColor;		// 減光色
-		matMap->specularColor = pmdMatDatas[i].specularColor;	// 光沢色
-		matMap->mirrorColor = pmdMatDatas[i].mirrorColor;		// 環境色
+		matMap->diffuseColor = pmdLoader->GetMatDatas()[i].diffuseColor;		// 減光色
+		matMap->specularColor = pmdLoader->GetMatDatas()[i].specularColor;	// 光沢色
+		matMap->mirrorColor = pmdLoader->GetMatDatas()[i].mirrorColor;		// 環境色
 
 		// アンマップ
 		materialBuffs[i]->Unmap(0, nullptr);
@@ -731,10 +599,10 @@ void Dx12Wrapper::InitMaterials()
 		auto image = whiteTexBuff;
 		auto spa = blackTexBuff;
 		auto sph = whiteTexBuff;
-		if (strlen(modelTexturesPath[i].c_str()) > 0)
+		if (strlen(pmdLoader->GetModelTexturesPath()[i].c_str()) > 0)
 		{
 			// とりあえず目が見たいから仮実装
-			std::string texFileName = modelTexturesPath[i];
+			std::string texFileName = pmdLoader->GetModelTexturesPath()[i];
 			if (count(texFileName.begin(), texFileName.end(), '*') > 0)
 			{
 				auto namepair = SplitFileName(texFileName);
@@ -768,9 +636,9 @@ void Dx12Wrapper::InitMaterials()
 
 		// トゥーンがあればそれを、なければデフォルトを使う
 		auto toon = gradTexBuff;
-		if (pmdMatDatas[i].toonIndex != 0xff)
+		if (pmdLoader->GetMatDatas()[i].toonIndex != 0xff)
 		{
-			toon = toonBuff[pmdMatDatas[i].toonIndex];
+			toon = toonBuff[pmdLoader->GetMatDatas()[i].toonIndex];
 		}
 
 		// マテリアルの色
@@ -803,7 +671,7 @@ void Dx12Wrapper::InitMaterials()
 
 void Dx12Wrapper::CreateModelTexture()
 {
-	unsigned int matNum = pmdMatDatas.size();
+	unsigned int matNum = pmdLoader->GetMatDatas().size();
 
 	std::vector<DirectX::TexMetadata> metadata = {};
 	std::vector<DirectX::ScratchImage> img;
@@ -822,14 +690,14 @@ void Dx12Wrapper::CreateModelTexture()
 
 	for (unsigned int i = 0; i < matNum; ++i)
 	{
-		if (std::strlen(modelTexturesPath[i].c_str()) == 0)
+		if (std::strlen(pmdLoader->GetModelTexturesPath()[i].c_str()) == 0)
 		{
 			// パスがなければ画像はないのでやらなくてよし
 			continue;
 		}
 
 		// スプリッタがある
-		std::string texFileName = modelTexturesPath[i];
+		std::string texFileName = pmdLoader->GetModelTexturesPath()[i];
 		if (count(texFileName.begin(), texFileName.end(), '*') > 0)
 		{
 			auto namepair = SplitFileName(texFileName);
@@ -997,7 +865,7 @@ void Dx12Wrapper::CreateToonTexture()
 
 std::string Dx12Wrapper::GetToonPathFromIndex(const std::string& folder, int idx)
 {
-	std::string filename = toonTexNames[idx];
+	std::string filename = pmdLoader->GetToonTexNames()[idx];
 	std::string path = "toon/";
 	path += filename;
 
@@ -1010,13 +878,6 @@ std::string Dx12Wrapper::GetToonPathFromIndex(const std::string& folder, int idx
 	{
 		return folder + filename;
 	}
-}
-
-std::string Dx12Wrapper::GetModelTexturePath(const std::string& modelpath, const char* texpath)
-{
-	auto spoint = modelpath.rfind("/");		// "/"を逆から探索 
-	auto path = (modelpath.substr(0, spoint) + "/" + texpath);		// ﾊﾟｽの合成
-	return path;
 }
 
 std::wstring Dx12Wrapper::GetWideStringFromString(std::string& str)
@@ -1070,7 +931,8 @@ Dx12Wrapper::Dx12Wrapper(HWND hwnd)
 	//modelPath = "model/vocaloid/巡音ルカ.pmd";
 	//modelPath = "model/yayoi/やよいヘッド_カジュアル（体x0.96）改造.pmd";
 	//modelPath = "model/hibiki/我那覇響v1.pmd";
-	Pmd(modelPath);
+	//Pmd(modelPath);
+	pmdLoader.reset(new PMDLoader(modelPath));
 
 	CreatePmdVertexBuffer();
 	CreateModelTexture();
@@ -1090,7 +952,6 @@ Dx12Wrapper::Dx12Wrapper(HWND hwnd)
 
 	cmdList->Close();
 }
-
 
 Dx12Wrapper::~Dx12Wrapper()
 {
@@ -1218,7 +1079,7 @@ void Dx12Wrapper::Draw()
 	auto heapStart = rtvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
 	bbIdx = swapChain->GetCurrentBackBufferIndex();		// ﾊﾞｯｸﾊﾞｯﾌｧｲﾝﾃﾞｯｽｸを調べる
 	heapStart.ptr += bbIdx * dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-	float clearColor[] = { 1.0f, 1.0f, 1.0f, 1.0f };				// クリアカラー設定
+	float clearColor[] = { 1.0f, 1.0f, 1.0f, 1.0f };	// クリアカラー設定
 	cmdList->OMSetRenderTargets(1, &heapStart, false, &dsvHeap->GetCPUDescriptorHandleForHeapStart());		// レンダーターゲット設定
 	cmdList->ClearDepthStencilView(dsvHeap->GetCPUDescriptorHandleForHeapStart(), D3D12_CLEAR_FLAG_DEPTH, 1.f, 0, 0, nullptr);	// 深度バッファのクリア
 
@@ -1241,7 +1102,7 @@ void Dx12Wrapper::Draw()
 	cmdList->SetDescriptorHeaps(1, &matDescriptorHeap);
 	auto handle = matDescriptorHeap->GetGPUDescriptorHandleForHeapStart();
 	auto hptr = dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-	for (auto& mat : pmdMatDatas)
+	for (auto& mat : pmdLoader->GetMatDatas())
 	{
 		cmdList->SetGraphicsRootDescriptorTable(1, handle);
 		handle.ptr += hptr * 5;
