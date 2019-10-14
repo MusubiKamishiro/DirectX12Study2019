@@ -9,6 +9,7 @@
 #include <memory>
 
 class PMDLoader;
+class Dx12PMDView;
 
 
 struct Vector3
@@ -134,11 +135,7 @@ private:
 	std::shared_ptr<PMDLoader> pmdLoader;
 	
 	// 頂点バッファの作成
-	void CreatePmdVertexBuffer();
-	ID3D12Resource* pmdVertexBuffer = nullptr;	// PMD用頂点バッファ
-	ID3D12Resource* pmdIndexBuffer = nullptr;	// PMD用インデックスバッファ
-	D3D12_VERTEX_BUFFER_VIEW pmdVbView = {};	// PMD用頂点バッファビュー
-	D3D12_INDEX_BUFFER_VIEW pmdIbView = {};		// PMD用インデックスバッファビュー
+	std::shared_ptr<Dx12PMDView> pmdView;
 	// マテリアルの初期化
 	void InitMaterials();
 	ID3D12DescriptorHeap* matDescriptorHeap;	// PMDマテリアル用デスクリプタヒープ

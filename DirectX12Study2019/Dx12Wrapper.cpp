@@ -6,6 +6,7 @@
 
 #include "Application.h"
 #include "PMDLoader.h"
+#include "Dx12PMDView.h"
 
 #pragma comment(lib,"d3d12.lib")
 #pragma comment(lib,"dxgi.lib")
@@ -230,8 +231,7 @@ void Dx12Wrapper::InitRootSignatur()
 	rootParam[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
 	rootParam[1].DescriptorTable.NumDescriptorRanges = 2;		// レンジの数
 	rootParam[1].DescriptorTable.pDescriptorRanges = &descRange[1];	// 対応するレンジへのポインタ
-	rootParam[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-	//rootParam[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+	rootParam[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
 
 	// サンプラの設定
@@ -451,53 +451,6 @@ std::pair<std::string, std::string> Dx12Wrapper::SplitFileName(const std::string
 	return ret;
 }
 
-void Dx12Wrapper::CreatePmdVertexBuffer()
-{
-	D3D12_HEAP_PROPERTIES heapprop = {};
-	heapprop.Type = D3D12_HEAP_TYPE_UPLOAD;
-	heapprop.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-	heapprop.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-
-	D3D12_RESOURCE_DESC resdesc = {};
-	resdesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-	resdesc.Width = pmdLoader->GetVertexDatas().size();	// 頂点情報が入るだけのサイズ
-	resdesc.Height = 1;
-	resdesc.DepthOrArraySize = 1;
-	resdesc.MipLevels = 1;
-	resdesc.Format = DXGI_FORMAT_UNKNOWN;
-	resdesc.SampleDesc.Count = 1;
-	resdesc.Flags = D3D12_RESOURCE_FLAG_NONE;
-	resdesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-
-	// 頂点バッファの作成
-	auto result = dev->CreateCommittedResource(&heapprop, D3D12_HEAP_FLAG_NONE, &resdesc,
-		D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&pmdVertexBuffer));
-
-	// インデックスバッファの作成
-	result = dev->CreateCommittedResource(&heapprop, D3D12_HEAP_FLAG_NONE,
-		&CD3DX12_RESOURCE_DESC::Buffer(pmdLoader->GetFaceVertices().size() * sizeof(pmdLoader->GetFaceVertices()[0])),
-		D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&pmdIndexBuffer));
-
-	D3D12_RANGE range = { 0,0 };
-	char* vertexMap = nullptr;
-	result = pmdVertexBuffer->Map(0, &range, (void**)&vertexMap);
-	std::copy(pmdLoader->GetVertexDatas().begin(), pmdLoader->GetVertexDatas().end(), vertexMap);
-	pmdVertexBuffer->Unmap(0, nullptr);
-
-	pmdVbView.BufferLocation = pmdVertexBuffer->GetGPUVirtualAddress();
-	pmdVbView.StrideInBytes = sizeof(PMDVertexData)-2;	// 頂点1つあたりのバイト数
-	pmdVbView.SizeInBytes = pmdLoader->GetVertexDatas().size();		// データ全体のサイズ
-
-	unsigned short* ibuffptr = nullptr;
-	result = pmdIndexBuffer->Map(0, &range, (void**)&ibuffptr);
-	std::copy(pmdLoader->GetFaceVertices().begin(), pmdLoader->GetFaceVertices().end(), ibuffptr);
-	pmdIndexBuffer->Unmap(0, nullptr);
-
-	pmdIbView.BufferLocation = pmdIndexBuffer->GetGPUVirtualAddress();	// バッファの場所
-	pmdIbView.Format = DXGI_FORMAT_R16_UINT;	// フォーマット(shortなのでR16)
-	pmdIbView.SizeInBytes = pmdLoader->GetFaceVertices().size() * sizeof(pmdLoader->GetFaceVertices()[0]);	// 総サイズ
-}
-
 void Dx12Wrapper::InitConstants()
 {
 	auto wsize = Application::Instance().GetWindowSize();	// 画面サイズ
@@ -617,8 +570,6 @@ void Dx12Wrapper::InitMaterials()
 			}
 			auto ext = GetExtension(texFileName.c_str());
 			// ここまで仮実装
-
-			//auto ext = GetExtension(modelTexturesPath[i].c_str());
 
 			if (ext == "png" || ext == "bmp" || ext == "jpg" || ext == "tga")
 			{
@@ -931,10 +882,9 @@ Dx12Wrapper::Dx12Wrapper(HWND hwnd)
 	//modelPath = "model/vocaloid/巡音ルカ.pmd";
 	//modelPath = "model/yayoi/やよいヘッド_カジュアル（体x0.96）改造.pmd";
 	//modelPath = "model/hibiki/我那覇響v1.pmd";
-	//Pmd(modelPath);
 	pmdLoader.reset(new PMDLoader(modelPath));
 
-	CreatePmdVertexBuffer();
+	pmdView.reset(new Dx12PMDView(dev, pmdLoader->GetVertexDatas(), pmdLoader->GetFaceVertices()));
 	CreateModelTexture();
 	CreateWhiteTexture();
 	CreateBlackTexture();
@@ -977,8 +927,6 @@ Dx12Wrapper::~Dx12Wrapper()
 	}
 
 	constBuff->Release();
-	pmdVertexBuffer->Release();
-	pmdIndexBuffer->Release();
 	depthBuff->Release();
 	dsvHeap->Release();
 	matDescriptorHeap->Release();
@@ -1093,8 +1041,8 @@ void Dx12Wrapper::Draw()
 	cmdList->SetGraphicsRootDescriptorTable(0, rgstDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
 
 	cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	cmdList->IASetVertexBuffers(0, 1, &pmdVbView);
-	cmdList->IASetIndexBuffer(&pmdIbView);
+	cmdList->IASetVertexBuffers(0, 1, &pmdView->GetVbView());
+	cmdList->IASetIndexBuffer(&pmdView->GetIbView());
 
 
 	// モデルの描画

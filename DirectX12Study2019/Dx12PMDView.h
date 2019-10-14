@@ -4,7 +4,7 @@
 #include <vector>
 
 
-class Dx12View
+class Dx12PMDView
 {
 private:
 	ID3D12Resource* vertexBuffer = nullptr;	// 頂点バッファ
@@ -13,7 +13,10 @@ private:
 	D3D12_INDEX_BUFFER_VIEW ibView = {};	// インデックスバッファビュー
 
 public:
-	Dx12View(ID3D12Device& dev, const std::vector<char>& vertices, const std::vector<unsigned short>& indices);
-	~Dx12View();
+	Dx12PMDView(ID3D12Device* dev, const std::vector<char>& vertices, const std::vector<unsigned short>& indices);
+	~Dx12PMDView();
+
+	D3D12_VERTEX_BUFFER_VIEW GetVbView()const;
+	D3D12_INDEX_BUFFER_VIEW GetIbView()const;
 };
 
