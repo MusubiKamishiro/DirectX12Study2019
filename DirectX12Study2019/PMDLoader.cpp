@@ -1,8 +1,12 @@
 #include "PMDLoader.h"
+#include "d3dx12.h"
 
+#pragma comment(lib,"d3d12.lib")
 
-PMDLoader::PMDLoader(const std::string& filepath)
+PMDLoader::PMDLoader(const std::string& filepath, ID3D12Device* dev)
 {
+	device = dev;
+
 	// モデルの読み込み
 	FILE* fp;
 	errno_t error;
@@ -132,6 +136,8 @@ PMDLoader::PMDLoader(const std::string& filepath)
 	fread(toonTexNames.data(), sizeof(char) * 100, toonTexNames.size(), fp);
 
 	fclose(fp);
+
+	CreateView();
 }
 
 PMDLoader::~PMDLoader()
@@ -145,7 +151,54 @@ std::string PMDLoader::GetModelTexturePath(const std::string& modelpath, const c
 	return path;
 }
 
-const std::vector<char>& PMDLoader::GetVertexDatas()
+void PMDLoader::CreateView()
+{
+	D3D12_HEAP_PROPERTIES heapprop = {};
+	heapprop.Type = D3D12_HEAP_TYPE_UPLOAD;
+	heapprop.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+	heapprop.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+
+	D3D12_RESOURCE_DESC resdesc = {};
+	resdesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+	resdesc.Width = vertexDatas.size();	// 頂点情報が入るだけのサイズ
+	resdesc.Height = 1;
+	resdesc.DepthOrArraySize = 1;
+	resdesc.MipLevels = 1;
+	resdesc.Format = DXGI_FORMAT_UNKNOWN;
+	resdesc.SampleDesc.Count = 1;
+	resdesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+	resdesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+
+	// 頂点バッファの作成
+	auto result = device->CreateCommittedResource(&heapprop, D3D12_HEAP_FLAG_NONE, &resdesc,
+		D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&vertexBuffer));
+
+	// インデックスバッファの作成
+	result = device->CreateCommittedResource(&heapprop, D3D12_HEAP_FLAG_NONE,
+		&CD3DX12_RESOURCE_DESC::Buffer(faceVertices.size() * sizeof(faceVertices[0])),
+		D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&indexBuffer));
+
+	D3D12_RANGE range = { 0,0 };
+	char* vertexMap = nullptr;
+	result = vertexBuffer->Map(0, &range, (void**)& vertexMap);
+	std::copy(vertexDatas.begin(), vertexDatas.end(), vertexMap);
+	vertexBuffer->Unmap(0, nullptr);
+
+	vbView.BufferLocation = vertexBuffer->GetGPUVirtualAddress();
+	vbView.StrideInBytes = 38;	// 頂点1つあたりのバイト数
+	vbView.SizeInBytes = vertexDatas.size();		// データ全体のサイズ
+
+	unsigned short* ibuffptr = nullptr;
+	result = indexBuffer->Map(0, &range, (void**)& ibuffptr);
+	std::copy(faceVertices.begin(), faceVertices.end(), ibuffptr);
+	indexBuffer->Unmap(0, nullptr);
+
+	ibView.BufferLocation = indexBuffer->GetGPUVirtualAddress();		// バッファの場所
+	ibView.Format = DXGI_FORMAT_R16_UINT;	// フォーマット(shortなのでR16)
+	ibView.SizeInBytes = faceVertices.size() * sizeof(faceVertices[0]);	// 総サイズ
+}
+
+const std::vector<char>& PMDLoader::GetVertexDatas()const
 {
 	return vertexDatas;
 }
@@ -173,4 +226,14 @@ const std::array<char[100], 10>& PMDLoader::GetToonTexNames()
 const std::vector<std::string>& PMDLoader::GetModelTexturesPath()
 {
 	return modelTexturesPath;
+}
+
+const D3D12_VERTEX_BUFFER_VIEW& PMDLoader::GetVbView() const
+{
+	return vbView;
+}
+
+const D3D12_INDEX_BUFFER_VIEW& PMDLoader::GetIbView() const
+{
+	return ibView;
 }

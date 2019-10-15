@@ -9,7 +9,7 @@
 #include <memory>
 
 class PMDLoader;
-class Dx12PMDView;
+class ImageManager;
 
 
 struct Vector3
@@ -21,8 +21,8 @@ struct Vertex {
 	Vertex() {};
 	Vertex(DirectX::XMFLOAT3 _pos, DirectX::XMFLOAT2 _uv) : pos(_pos), uv(_uv) {};
 
-	DirectX::XMFLOAT3 pos;	// 座標
-	DirectX::XMFLOAT2 uv;	// UV座標
+	DirectX::XMFLOAT3 pos = DirectX::XMFLOAT3(0, 0, 0);	// 座標
+	DirectX::XMFLOAT2 uv = DirectX::XMFLOAT2(0, 0);		// UV座標
 };
 
 struct WVP {
@@ -117,6 +117,7 @@ private:
 	
 	D3D12_RESOURCE_BARRIER BarrierDesc = {};	// バリア
 
+	std::shared_ptr<ImageManager> imageManager;
 
 	// 拡張子を取得する
 	//@param path 対象パスの文字列
@@ -134,8 +135,6 @@ private:
 	// PMDを読み込み
 	std::shared_ptr<PMDLoader> pmdLoader;
 	
-	// 頂点バッファの作成
-	std::shared_ptr<Dx12PMDView> pmdView;
 	// マテリアルの初期化
 	void InitMaterials();
 	ID3D12DescriptorHeap* matDescriptorHeap;	// PMDマテリアル用デスクリプタヒープ

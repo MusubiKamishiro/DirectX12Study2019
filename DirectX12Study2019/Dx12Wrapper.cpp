@@ -6,7 +6,7 @@
 
 #include "Application.h"
 #include "PMDLoader.h"
-#include "Dx12PMDView.h"
+#include "ImageManager.h"
 
 #pragma comment(lib,"d3d12.lib")
 #pragma comment(lib,"dxgi.lib")
@@ -624,20 +624,9 @@ void Dx12Wrapper::CreateModelTexture()
 {
 	unsigned int matNum = pmdLoader->GetMatDatas().size();
 
-	std::vector<DirectX::TexMetadata> metadata = {};
-	std::vector<DirectX::ScratchImage> img;
-	std::vector<DirectX::ScratchImage> spa;
-	std::vector<DirectX::ScratchImage> sph;
-
 	modelTexBuff.resize(matNum);
 	spaBuff.resize(matNum);
 	sphBuff.resize(matNum);
-	
-	metadata.resize(matNum);
-	img.resize(matNum);
-	spa.resize(matNum);
-	sph.resize(matNum);
-
 
 	for (unsigned int i = 0; i < matNum; ++i)
 	{
@@ -665,72 +654,19 @@ void Dx12Wrapper::CreateModelTexture()
 		auto ext = GetExtension(texFileName.c_str());
 		auto path = GetWideStringFromString(texFileName);
 
-		// 画像読み込み
-		auto result = E_FAIL;
-		if (ext == "png" || ext == "bmp" || ext == "jpg")
-		{
-			result = DirectX::LoadFromWICFile(path.data(), DirectX::WIC_FLAGS_NONE, &metadata[i], img[i]);
-		}
-		else if (ext == "tga")
-		{
-			result = DirectX::LoadFromTGAFile(path.data(), &metadata[i], img[i]);
-		}
-		else if (ext == "spa")
-		{
-			result = DirectX::LoadFromWICFile(path.data(), DirectX::WIC_FLAGS_NONE, &metadata[i], spa[i]);
-		}
-		else if (ext == "sph")
-		{
-			result = DirectX::LoadFromWICFile(path.data(), DirectX::WIC_FLAGS_NONE, &metadata[i], sph[i]);
-		}
-
-		// テクスチャバッファの作成
+		// 画像読み込み&書き込み
 		if (ext == "png" || ext == "bmp" || ext == "jpg" || ext == "tga")
 		{
-			modelTexBuff[i] = CreateTextureResource(modelTexBuff[i], metadata[i].width, metadata[i].height, metadata[i].arraySize);
+			modelTexBuff[i] = imageManager->Load(texFileName);
 		}
 		else if (ext == "spa")
 		{
-			spaBuff[i] = CreateTextureResource(spaBuff[i], metadata[i].width, metadata[i].height, metadata[i].arraySize);
+			spaBuff[i] = imageManager->Load(texFileName);
 		}
 		else if (ext == "sph")
 		{
-			sphBuff[i] = CreateTextureResource(sphBuff[i], metadata[i].width, metadata[i].height, metadata[i].arraySize);
+			sphBuff[i] = imageManager->Load(texFileName);
 		}
-
-		// テクスチャ書き込み
-		if (ext == "png" || ext == "bmp" || ext == "jpg" || ext == "tga")
-		{
-			result = modelTexBuff[i]->WriteToSubresource(
-				0,
-				nullptr,
-				img[i].GetPixels(),
-				metadata[i].width * 4,
-				img[i].GetPixelsSize());
-		}
-		else if (ext == "spa")
-		{
-			result = spaBuff[i]->WriteToSubresource(
-				0,
-				nullptr,
-				spa[i].GetPixels(),
-				metadata[i].width * 4,
-				spa[i].GetPixelsSize());
-		}
-		else if (ext == "sph")
-		{
-			result = sphBuff[i]->WriteToSubresource(
-				0,
-				nullptr,
-				sph[i].GetPixels(),
-				metadata[i].width * 4,
-				sph[i].GetPixelsSize());
-		}
-
-		// 書き込んだらもう用はないので解放
-		img[i].Release();
-		spa[i].Release();
-		sph[i].Release();
 	}
 }
 
@@ -877,14 +813,15 @@ Dx12Wrapper::Dx12Wrapper(HWND hwnd)
 
 	result = dev->CreateDescriptorHeap(&descHeapDesc, IID_PPV_ARGS(&rgstDescriptorHeap));
 
+	imageManager.reset(new ImageManager(dev));
+
 	//modelPath = "model/vocaloid/初音ミク.pmd";
 	modelPath = "model/vocaloid/初音ミクmetal.pmd";
 	//modelPath = "model/vocaloid/巡音ルカ.pmd";
 	//modelPath = "model/yayoi/やよいヘッド_カジュアル（体x0.96）改造.pmd";
 	//modelPath = "model/hibiki/我那覇響v1.pmd";
-	pmdLoader.reset(new PMDLoader(modelPath));
+	pmdLoader.reset(new PMDLoader(modelPath, dev));
 
-	pmdView.reset(new Dx12PMDView(dev, pmdLoader->GetVertexDatas(), pmdLoader->GetFaceVertices()));
 	CreateModelTexture();
 	CreateWhiteTexture();
 	CreateBlackTexture();
@@ -1041,8 +978,8 @@ void Dx12Wrapper::Draw()
 	cmdList->SetGraphicsRootDescriptorTable(0, rgstDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
 
 	cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	cmdList->IASetVertexBuffers(0, 1, &pmdView->GetVbView());
-	cmdList->IASetIndexBuffer(&pmdView->GetIbView());
+	cmdList->IASetVertexBuffers(0, 1, &pmdLoader->GetVbView());
+	cmdList->IASetIndexBuffer(&pmdLoader->GetIbView());
 
 
 	// モデルの描画

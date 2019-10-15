@@ -1,4 +1,5 @@
 #pragma once
+#include <d3d12.h>
 #include <DirectXMath.h>
 
 #include <vector>
@@ -57,6 +58,8 @@ struct PMDBoneData
 class PMDLoader
 {
 private:
+	ID3D12Device* device;
+
 	std::vector<char> vertexDatas;				// 頂点データ
 	std::vector<unsigned short> faceVertices;	// 面頂点データ
 	std::vector<PMDMaterialData> matDatas;		// マテリアルデータ
@@ -64,18 +67,29 @@ private:
 	std::array<char[100], 10> toonTexNames;		// トゥーンテクスチャの名前, 固定
 	std::vector<std::string> modelTexturesPath;	// モデルに張り付けるテクスチャのパス(中身がないときもある)
 
+	ID3D12Resource* vertexBuffer = nullptr;	// 頂点バッファ
+	ID3D12Resource* indexBuffer = nullptr;	// インデックスバッファ
+	D3D12_VERTEX_BUFFER_VIEW vbView = {};	// 頂点バッファビュー
+	D3D12_INDEX_BUFFER_VIEW ibView = {};	// インデックスバッファビュー
+
 	// モデルのテクスチャのパスを獲得
 	std::string GetModelTexturePath(const std::string& modelpath, const char* texpath);
 
+	// ビューの作成
+	void CreateView();
+
 public:
-	PMDLoader(const std::string& filepath);
+	PMDLoader(const std::string& filepath, ID3D12Device* dev);
 	~PMDLoader();
 
-	const std::vector<char>& GetVertexDatas();			// PMD頂点データ
-	const std::vector<unsigned short>& GetFaceVertices();// PMD面頂点データ
-	const std::vector<PMDMaterialData>& GetMatDatas();	// PMDマテリアルデータ
-	const std::vector<PMDBoneData>& GetBones();			// PMDの骨
-	const std::array<char[100], 10>& GetToonTexNames();		// トゥーンテクスチャの名前, 固定
-	const std::vector<std::string>& GetModelTexturesPath();	// モデルに張り付けるテクスチャのパス(中身がないときもある)
+	const std::vector<char>& GetVertexDatas()const;
+	const std::vector<unsigned short>& GetFaceVertices();
+	const std::vector<PMDMaterialData>& GetMatDatas();
+	const std::vector<PMDBoneData>& GetBones();
+	const std::array<char[100], 10>& GetToonTexNames();
+	const std::vector<std::string>& GetModelTexturesPath();
+
+	const D3D12_VERTEX_BUFFER_VIEW& GetVbView()const;
+	const D3D12_INDEX_BUFFER_VIEW& GetIbView()const;
 };
 
