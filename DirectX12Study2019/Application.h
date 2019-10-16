@@ -17,7 +17,7 @@ class Application
 {
 private:
 	Application();
-	Application(const Application&);	// ｺﾋﾟｰ禁止
+	Application(const Application&);	// コピー禁止
 	void operator=(const Application&);	// 代入禁止
 
 	bool InitWindow();	// ウィンドウの初期化

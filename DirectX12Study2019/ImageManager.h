@@ -1,14 +1,15 @@
 #pragma once
 #include <d3d12.h>
+#include <DirectXTex.h>
 
 #include <map>
 #include <string>
 
+
 class ImageManager
 {
 private:
-	ID3D12Device* device;
-	std::map<std::string, int> table;
+	std::map<std::string, ID3D12Resource*> table;
 
 	// Šg’£q‚ğæ“¾‚·‚é
 	//@param path ‘ÎÛƒpƒX‚Ì•¶š—ñ
@@ -25,7 +26,7 @@ private:
 		const unsigned int height = 4, const unsigned int arraySize = 1);
 
 public:
-	ImageManager(ID3D12Device* dev);
+	ImageManager();
 	~ImageManager();
 
 	ID3D12Resource* Load(const std::string& filepath);

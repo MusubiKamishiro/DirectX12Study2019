@@ -1,10 +1,9 @@
 #include "ImageManager.h"
-#include <DirectXTex.h>
 
+#include "Dx12Device.h"
 
 #pragma comment(lib,"d3d12.lib")
 #pragma comment(lib, "DirectXTex.lib")
-
 
 
 std::string ImageManager::GetExtension(const char* path)
@@ -53,7 +52,7 @@ ID3D12Resource* ImageManager::CreateTextureResource(ID3D12Resource* buff, const 
 	resDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
 	resDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
 
-	auto result = device->CreateCommittedResource(
+	auto result = Dx12Device::Instance().GetDevice()->CreateCommittedResource(
 		&heapprop,
 		D3D12_HEAP_FLAG_NONE,
 		&resDesc,
@@ -68,9 +67,8 @@ ID3D12Resource* ImageManager::CreateTextureResource(ID3D12Resource* buff, const 
 	return nullptr;
 }
 
-ImageManager::ImageManager(ID3D12Device* dev)
+ImageManager::ImageManager()
 {
-	device = dev;
 }
 
 ImageManager::~ImageManager()
@@ -82,26 +80,38 @@ ID3D12Resource* ImageManager::Load(const std::string& filepath)
 	DirectX::TexMetadata metadata = {};
 	DirectX::ScratchImage img;
 	ID3D12Resource* texBuff = nullptr;
-
-	auto ext = GetExtension(filepath.c_str());
-	auto path = GetWideStringFromString(filepath);
-
-	// 画像読み込み
 	auto result = E_FAIL;
-	if (ext == "png" || ext == "bmp" || ext == "jpg" || ext == "spa" || ext == "sph")
-	{
-		result = DirectX::LoadFromWICFile(path.data(), DirectX::WIC_FLAGS_NONE, &metadata, img);
-	}
-	else if (ext == "tga")
-	{
-		result = DirectX::LoadFromTGAFile(path.data(), &metadata, img);
-	}
 
-	// テクスチャバッファの作成
-	texBuff = CreateTextureResource(texBuff, metadata.width, metadata.height, metadata.arraySize);
+	// データが見つからなかったら読み込む
+	auto it = table.find(filepath);
+	if (it == table.end())
+	{
+		auto ext = GetExtension(filepath.c_str());
+		auto path = GetWideStringFromString(filepath);
 
-	// テクスチャバッファに書き込み
-	result = texBuff->WriteToSubresource(0, nullptr, img.GetPixels(), metadata.width * 4, img.GetPixelsSize());
-	
-	return texBuff;
+		// 画像読み込み
+		if (ext == "png" || ext == "bmp" || ext == "jpg" || ext == "spa" || ext == "sph")
+		{
+			result = DirectX::LoadFromWICFile(path.data(), DirectX::WIC_FLAGS_NONE, &metadata, img);
+		}
+		else if (ext == "tga")
+		{
+			result = DirectX::LoadFromTGAFile(path.data(), &metadata, img);
+		}
+
+		// テクスチャバッファの作成
+		texBuff = CreateTextureResource(texBuff, metadata.width, metadata.height, metadata.arraySize);
+
+		// テクスチャバッファに書き込み
+		result = texBuff->WriteToSubresource(0, nullptr, img.GetPixels(), metadata.width * 4, img.GetPixelsSize());
+
+		// テーブルに追加しておく
+		table.emplace(filepath, texBuff);
+
+		return texBuff;
+	}
+	else
+	{
+		return table[filepath];
+	}
 }

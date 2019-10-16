@@ -8,8 +8,8 @@
 #include <string>
 #include <memory>
 
-class PMDLoader;
 class ImageManager;
+class PMDLoader;
 
 
 struct Vector3
@@ -17,7 +17,8 @@ struct Vector3
 	float x, y, z;
 };
 
-struct Vertex {
+struct Vertex
+{
 	Vertex() {};
 	Vertex(DirectX::XMFLOAT3 _pos, DirectX::XMFLOAT2 _uv) : pos(_pos), uv(_uv) {};
 
@@ -25,7 +26,8 @@ struct Vertex {
 	DirectX::XMFLOAT2 uv = DirectX::XMFLOAT2(0, 0);		// UV座標
 };
 
-struct WVP {
+struct WVP
+{
 	DirectX::XMMATRIX world;		// ワールド
 	DirectX::XMMATRIX viewProj;		// ビュープロジェクション
 	DirectX::XMMATRIX wvp;			// 合成済み
@@ -36,13 +38,8 @@ struct WVP {
 class Dx12Wrapper
 {
 private:
-	// 
-	ID3D12DescriptorHeap* rgstDescriptorHeap = nullptr;
-	// 基本的な奴(DXGI)
-	IDXGIFactory6* dxgiFactory = nullptr;
+	ID3D12DescriptorHeap* rgstDescriptorHeap = nullptr;	// レジスタデスクリプタヒープ
 	IDXGISwapChain4* swapChain = nullptr;	// スワップチェイン
-	// 基本的な奴(デバイス)
-	ID3D12Device* dev = nullptr;
 	// コマンド系
 	ID3D12CommandAllocator* cmdAllocator = nullptr;	// コマンドアロケータ
 	// コマンドリスト本体
@@ -54,8 +51,6 @@ private:
 
 	// デバッグレイヤの作成
 	void CreateDebugLayer();
-	// フィーチャーレベルの選択
-	void InitFeatureLevel();
 	// スワップチェインの作成
 	void CreateSwapChain(HWND hwnd);
 	// レンダーターゲットの作成

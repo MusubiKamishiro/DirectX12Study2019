@@ -4,7 +4,6 @@
 
 #include <vector>
 #include <array>
-//#include <map>
 #include <string>
 
 // PMDのヘッダファイル
@@ -58,8 +57,6 @@ struct PMDBoneData
 class PMDLoader
 {
 private:
-	ID3D12Device* device;
-
 	std::vector<char> vertexDatas;				// 頂点データ
 	std::vector<unsigned short> faceVertices;	// 面頂点データ
 	std::vector<PMDMaterialData> matDatas;		// マテリアルデータ
@@ -79,7 +76,7 @@ private:
 	void CreateView();
 
 public:
-	PMDLoader(const std::string& filepath, ID3D12Device* dev);
+	PMDLoader(const std::string& filepath);
 	~PMDLoader();
 
 	const std::vector<char>& GetVertexDatas()const;

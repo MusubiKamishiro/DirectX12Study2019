@@ -1,12 +1,12 @@
 #include "PMDLoader.h"
 #include "d3dx12.h"
 
+#include "Dx12Device.h"
+
 #pragma comment(lib,"d3d12.lib")
 
-PMDLoader::PMDLoader(const std::string& filepath, ID3D12Device* dev)
+PMDLoader::PMDLoader(const std::string& filepath)
 {
-	device = dev;
-
 	// モデルの読み込み
 	FILE* fp;
 	errno_t error;
@@ -169,12 +169,13 @@ void PMDLoader::CreateView()
 	resdesc.Flags = D3D12_RESOURCE_FLAG_NONE;
 	resdesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
 
+	auto dev = Dx12Device::Instance().GetDevice();
 	// 頂点バッファの作成
-	auto result = device->CreateCommittedResource(&heapprop, D3D12_HEAP_FLAG_NONE, &resdesc,
+	auto result = dev->CreateCommittedResource(&heapprop, D3D12_HEAP_FLAG_NONE, &resdesc,
 		D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&vertexBuffer));
 
 	// インデックスバッファの作成
-	result = device->CreateCommittedResource(&heapprop, D3D12_HEAP_FLAG_NONE,
+	result = dev->CreateCommittedResource(&heapprop, D3D12_HEAP_FLAG_NONE,
 		&CD3DX12_RESOURCE_DESC::Buffer(faceVertices.size() * sizeof(faceVertices[0])),
 		D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&indexBuffer));
 

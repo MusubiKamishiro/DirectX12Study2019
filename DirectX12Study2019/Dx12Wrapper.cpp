@@ -5,6 +5,7 @@
 #include "shlwapi.h"
 
 #include "Application.h"
+#include "Dx12Device.h"
 #include "PMDLoader.h"
 #include "ImageManager.h"
 
@@ -26,49 +27,6 @@ void Dx12Wrapper::CreateDebugLayer()
 	debug->Release();
 }
 
-void Dx12Wrapper::InitFeatureLevel()
-{
-	D3D_FEATURE_LEVEL levels[] = {
-		D3D_FEATURE_LEVEL_12_1,
-		D3D_FEATURE_LEVEL_12_0,
-		D3D_FEATURE_LEVEL_11_1,
-		D3D_FEATURE_LEVEL_11_0,
-	};
-
-	// グラフィックスアダプタを列挙させる
-	std::vector<IDXGIAdapter*> adapters;
-	IDXGIAdapter* adapter = nullptr;
-	for (int i = 0; dxgiFactory->EnumAdapters(i, &adapter) != DXGI_ERROR_NOT_FOUND; ++i)
-	{
-		adapters.push_back(adapter);
-	}
-	// その中からNVIDIAを探す
-	for (auto& adpt : adapters)
-	{
-		DXGI_ADAPTER_DESC aDesc = {};
-		adpt->GetDesc(&aDesc);
-		std::wstring strDesc = aDesc.Description;
-		if (strDesc.find(L"NVIDIA") != std::string::npos)
-		{
-			// NVIDIAアダプタを強制
-			adapter = adpt;
-			break;
-		}
-	}
-
-	// レベルの高いものから検証し、成功したレベルを適用する
-	for (auto& l : levels)
-	{
-		// ディスプレイアダプターを表すデバイスの作成
-		auto result = D3D12CreateDevice(adapter, l, IID_PPV_ARGS(&dev));
-
-		if (SUCCEEDED(result))
-		{
-			break;
-		}
-	}
-}
-
 void Dx12Wrapper::CreateSwapChain(HWND hwnd)
 {
 	// コマンドキューの作成
@@ -77,7 +35,7 @@ void Dx12Wrapper::CreateSwapChain(HWND hwnd)
 	cmdQDesc.NodeMask = 0;
 	cmdQDesc.Priority = D3D12_COMMAND_QUEUE_PRIORITY_NORMAL;
 	cmdQDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
-	auto result = dev->CreateCommandQueue(&cmdQDesc, IID_PPV_ARGS(&cmdQueue));
+	auto result = Dx12Device::Instance().GetDevice()->CreateCommandQueue(&cmdQDesc, IID_PPV_ARGS(&cmdQueue));
 
 	// スワップチェインの作成
 	auto wsize = Application::Instance().GetWindowSize();
@@ -93,12 +51,14 @@ void Dx12Wrapper::CreateSwapChain(HWND hwnd)
 	swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
 	swapChainDesc.BufferCount = 2;			// バックバッファの数
 
-	result = dxgiFactory->CreateSwapChainForHwnd(
+	result = Dx12Device::Instance().GetDxgiFactory()->CreateSwapChainForHwnd(
 		cmdQueue, hwnd, &swapChainDesc, nullptr, nullptr, (IDXGISwapChain1**)(&swapChain));
 }
 
 void Dx12Wrapper::CreateRenderTarget()
 {
+	auto dev = Dx12Device::Instance().GetDevice();
+
 	// レンダーターゲット作成のための前準備
 	// 表示画面用メモリ確保
 	D3D12_DESCRIPTOR_HEAP_DESC descriptorHeapDesc = {};
@@ -149,7 +109,8 @@ void Dx12Wrapper::CreateVertexBuffer()
 	resdesc.SampleDesc.Count = 1;
 	resdesc.Flags = D3D12_RESOURCE_FLAG_NONE;
 	resdesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-
+	
+	auto dev = Dx12Device::Instance().GetDevice();
 	// 頂点バッファの作成
 	auto result = dev->CreateCommittedResource(&heapprop, D3D12_HEAP_FLAG_NONE, &resdesc,
 								D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&vertexBuffer));
@@ -261,7 +222,7 @@ void Dx12Wrapper::InitRootSignatur()
 	auto result = D3D12SerializeRootSignature(&rsd, D3D_ROOT_SIGNATURE_VERSION_1, &signature, &error);
 
 	// ルートシグネチャの作成
-	result = dev->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&rootSignature));
+	result = Dx12Device::Instance().GetDevice()->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&rootSignature));
 }
 
 void Dx12Wrapper::InitPipelineState()
@@ -311,7 +272,7 @@ void Dx12Wrapper::InitPipelineState()
 	gpsDesc.SampleMask = 0xffffffff;	// 全部1
 	gpsDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;	// 三角形
 
-	auto result = dev->CreateGraphicsPipelineState(&gpsDesc, IID_PPV_ARGS(&pipelineState));
+	auto result = Dx12Device::Instance().GetDevice()->CreateGraphicsPipelineState(&gpsDesc, IID_PPV_ARGS(&pipelineState));
 }
 
 ID3D12Resource* Dx12Wrapper::CreateTextureResource(ID3D12Resource* buff, const unsigned int width, const unsigned int height, const unsigned int arraySize)
@@ -336,7 +297,7 @@ ID3D12Resource* Dx12Wrapper::CreateTextureResource(ID3D12Resource* buff, const u
 	resDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
 	resDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
 
-	auto result = dev->CreateCommittedResource(
+	auto result = Dx12Device::Instance().GetDevice()->CreateCommittedResource(
 		&heapprop,
 		D3D12_HEAP_FLAG_NONE,
 		&resDesc,
@@ -370,6 +331,7 @@ void Dx12Wrapper::CreateDepthBuff()
 	_depthClearValue.DepthStencil.Depth = 1.0f;	// 深さ最大値は1
 	_depthClearValue.Format = DXGI_FORMAT_D32_FLOAT;
 
+	auto dev = Dx12Device::Instance().GetDevice();
 	// 深度バッファの作成
 	auto result = dev->CreateCommittedResource(
 		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
@@ -480,6 +442,7 @@ void Dx12Wrapper::InitConstants()
 	size_t size = sizeof(mappedMatrix);
 	size = (size + 0xff) & ~0xff;		// 256アライメントに合わせている
 
+	auto dev = Dx12Device::Instance().GetDevice();
 	auto result = dev->CreateCommittedResource(
 		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
 		D3D12_HEAP_FLAGS::D3D12_HEAP_FLAG_NONE,
@@ -510,6 +473,7 @@ void Dx12Wrapper::InitMaterials()
 	descHeapDesc.NumDescriptors = materialBuffs.size() * 5;
 	descHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 
+	auto dev = Dx12Device::Instance().GetDevice();
 	// ヒープ作成
 	auto result = dev->CreateDescriptorHeap(&descHeapDesc, IID_PPV_ARGS(&matDescriptorHeap));
 
@@ -790,15 +754,12 @@ Dx12Wrapper::Dx12Wrapper(HWND hwnd)
 	CreateDebugLayer();
 #endif // _DEBUG
 
-	// DXGIファクトリの作成
-	auto result = CreateDXGIFactory1(IID_PPV_ARGS(&dxgiFactory));
-
-	InitFeatureLevel();
+	auto dev = Dx12Device::Instance().GetDevice();
 	CreateSwapChain(hwnd);
 	CreateRenderTarget();
 	
 	// コマンドアロケータとコマンドリストの生成
-	result = dev->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&cmdAllocator));
+	auto result = dev->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&cmdAllocator));
 	result = dev->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, cmdAllocator, nullptr, IID_PPV_ARGS(&cmdList));
 	// フェンスの作成
 	result = dev->CreateFence(fenceValue, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence));
@@ -813,14 +774,14 @@ Dx12Wrapper::Dx12Wrapper(HWND hwnd)
 
 	result = dev->CreateDescriptorHeap(&descHeapDesc, IID_PPV_ARGS(&rgstDescriptorHeap));
 
-	imageManager.reset(new ImageManager(dev));
+	imageManager.reset(new ImageManager());
 
 	//modelPath = "model/vocaloid/初音ミク.pmd";
 	modelPath = "model/vocaloid/初音ミクmetal.pmd";
 	//modelPath = "model/vocaloid/巡音ルカ.pmd";
 	//modelPath = "model/yayoi/やよいヘッド_カジュアル（体x0.96）改造.pmd";
 	//modelPath = "model/hibiki/我那覇響v1.pmd";
-	pmdLoader.reset(new PMDLoader(modelPath, dev));
+	pmdLoader.reset(new PMDLoader(modelPath));
 
 	CreateModelTexture();
 	CreateWhiteTexture();
@@ -846,9 +807,7 @@ Dx12Wrapper::~Dx12Wrapper()
 	cmdAllocator->Release();
 	cmdList->Release();
 	cmdQueue->Release();
-	dxgiFactory->Release();
 	swapChain->Release();
-	dev->Release();
 	fence->Release();
 	vertexShader->Release();
 	pixelShader->Release();
@@ -961,6 +920,7 @@ void Dx12Wrapper::Draw()
 	cmdList->RSSetViewports(1, &viewport);
 	cmdList->RSSetScissorRects(1, &scissorRect);
 
+	auto dev = Dx12Device::Instance().GetDevice();
 	auto heapStart = rtvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
 	bbIdx = swapChain->GetCurrentBackBufferIndex();		// ﾊﾞｯｸﾊﾞｯﾌｧｲﾝﾃﾞｯｽｸを調べる
 	heapStart.ptr += bbIdx * dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
