@@ -69,10 +69,15 @@ ID3D12Resource* ImageManager::CreateTextureResource(ID3D12Resource* buff, const 
 
 ImageManager::ImageManager()
 {
+	auto result = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
 }
 
 ImageManager::~ImageManager()
 {
+	for (auto& t : table)
+	{
+		t.second->Release();
+	}
 }
 
 ID3D12Resource* ImageManager::Load(const std::string& filepath)

@@ -2,18 +2,16 @@
 #include <d3dcompiler.h>
 #include <DirectXTex.h>
 #include "d3dx12.h"
-#include "shlwapi.h"
 
 #include "Application.h"
 #include "Dx12Device.h"
-#include "PMDLoader.h"
-#include "ImageManager.h"
+#include "Dx12Constants.h"
+#include "PMDManager.h"
 
 #pragma comment(lib,"d3d12.lib")
 #pragma comment(lib,"dxgi.lib")
 #pragma comment(lib, "d3dcompiler.lib")
 #pragma comment(lib, "DirectXTex.lib")
-#pragma comment(lib, "shlwapi.lib")
 
 
 void Dx12Wrapper::CreateDebugLayer()
@@ -275,43 +273,6 @@ void Dx12Wrapper::InitPipelineState()
 	auto result = Dx12Device::Instance().GetDevice()->CreateGraphicsPipelineState(&gpsDesc, IID_PPV_ARGS(&pipelineState));
 }
 
-ID3D12Resource* Dx12Wrapper::CreateTextureResource(ID3D12Resource* buff, const unsigned int width, const unsigned int height, const unsigned int arraySize)
-{
-	D3D12_HEAP_PROPERTIES heapprop = {};
-	heapprop.Type = D3D12_HEAP_TYPE_CUSTOM;
-	heapprop.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_WRITE_BACK;
-	heapprop.MemoryPoolPreference = D3D12_MEMORY_POOL_L0;
-	heapprop.CreationNodeMask = 1;
-	heapprop.VisibleNodeMask = 1;
-
-	D3D12_RESOURCE_DESC resDesc = {};
-	resDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-	resDesc.Alignment = 0;
-	resDesc.Width = width;
-	resDesc.Height = height;
-	resDesc.DepthOrArraySize = arraySize;
-	resDesc.MipLevels = 0;
-	resDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-	resDesc.SampleDesc.Count = 1;
-	resDesc.SampleDesc.Quality = 0;
-	resDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
-	resDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
-
-	auto result = Dx12Device::Instance().GetDevice()->CreateCommittedResource(
-		&heapprop,
-		D3D12_HEAP_FLAG_NONE,
-		&resDesc,
-		D3D12_RESOURCE_STATE_COPY_DEST,
-		nullptr,
-		IID_PPV_ARGS(&buff));
-
-	if (result == S_OK)
-	{
-		return buff;
-	}
-	return nullptr;
-}
-
 void Dx12Wrapper::CreateDepthBuff()
 {
 	auto wsize = Application::Instance().GetWindowSize();
@@ -397,357 +358,6 @@ void Dx12Wrapper::WaitExecute()
 	}
 }
 
-std::string Dx12Wrapper::GetExtension(const char* path)
-{
-	std::string s = path;
-	size_t dpoint = s.rfind(".") + 1;		// "."の場所を探る
-	return s.substr(dpoint);
-}
-
-std::pair<std::string, std::string> Dx12Wrapper::SplitFileName(const std::string& path, const char splitter)
-{
-	int idx = path.find(splitter);
-	std::pair<std::string, std::string> ret;
-	ret.first = path.substr(0, idx);
-	ret.second = path.substr(idx + 1, path.length() - idx - 1);
-	return ret;
-}
-
-void Dx12Wrapper::InitConstants()
-{
-	auto wsize = Application::Instance().GetWindowSize();	// 画面サイズ
-
-	DirectX::XMMATRIX world = DirectX::XMMatrixIdentity();
-	mappedMatrix.world = world;
-
-	// カメラの設定
-	auto eyePos = DirectX::XMFLOAT3(0, 20, -15);	// カメラの位置(視点)
-	auto focusPos = DirectX::XMFLOAT3(0, 10, 0);	// 焦点の位置(注視点)
-	auto up = DirectX::XMFLOAT3(0.0f, 1.0f, 0.0f);	// カメラの上方向(通常は(0.0f, 1.0f, 0.0f))	// カメラを固定するためのもの
-
-	DirectX::XMMATRIX camera = DirectX::XMMatrixLookAtLH(XMLoadFloat3(&eyePos), XMLoadFloat3(&focusPos), XMLoadFloat3(&up));	// カメラ行列
-													// XMLoadFloat3...XMFloat3をXMVECTORに変換する
-
-	auto aspect = (float)wsize.width / (float)wsize.height;		// ビュー空間の高さと幅のアスペクト比
-	DirectX::XMMATRIX projection = DirectX::XMMatrixPerspectiveFovLH(3.1415f / 2.0f, aspect, 0.5f, 300.0f);		// 射影行列	// LH...LeftHandの略,RHもあるよ
-	DirectX::XMMATRIX lightProj = DirectX::XMMatrixOrthographicLH(30, 30, 0.5f, 300.0f);
-
-	mappedMatrix.viewProj = camera * projection;	// かける順番には気を付けよう
-	mappedMatrix.wvp = world * camera * projection;
-
-	auto lightPos = DirectX::XMFLOAT3(50, 70, -15);
-	DirectX::XMMATRIX _lcamera = DirectX::XMMatrixLookAtLH(XMLoadFloat3(&lightPos), XMLoadFloat3(&focusPos), XMLoadFloat3(&up));
-	mappedMatrix.lightVP = _lcamera * lightProj;
-
-	size_t size = sizeof(mappedMatrix);
-	size = (size + 0xff) & ~0xff;		// 256アライメントに合わせている
-
-	auto dev = Dx12Device::Instance().GetDevice();
-	auto result = dev->CreateCommittedResource(
-		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
-		D3D12_HEAP_FLAGS::D3D12_HEAP_FLAG_NONE,
-		&CD3DX12_RESOURCE_DESC::Buffer(size),
-		D3D12_RESOURCE_STATE_GENERIC_READ,
-		nullptr,
-		IID_PPV_ARGS(&constBuff));
-
-	result = constBuff->Map(0, nullptr, (void**)&m);	// シェーダに送る
-	*m = mappedMatrix;
-
-	auto handle = rgstDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
-	D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
-	cbvDesc.BufferLocation = constBuff->GetGPUVirtualAddress();
-	cbvDesc.SizeInBytes = size;
-	dev->CreateConstantBufferView(&cbvDesc, handle);
-}
-
-void Dx12Wrapper::InitMaterials()
-{
-	// バッファのリサイズ
-	materialBuffs.resize(pmdLoader->GetMatDatas().size());
-
-	// ヒープの設定
-	D3D12_DESCRIPTOR_HEAP_DESC descHeapDesc = {};
-	descHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-	descHeapDesc.NodeMask = 0;
-	descHeapDesc.NumDescriptors = materialBuffs.size() * 5;
-	descHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-
-	auto dev = Dx12Device::Instance().GetDevice();
-	// ヒープ作成
-	auto result = dev->CreateDescriptorHeap(&descHeapDesc, IID_PPV_ARGS(&matDescriptorHeap));
-
-	size_t size = sizeof(mappedMatrix);
-	size = (size + 0xff) & ~0xff;		// 256アライメントに合わせている
-
-	D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
-	cbvDesc.SizeInBytes = size;
-
-	// ハンドルの取得
-	auto handle = matDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
-
-	// マテリアル数分作る
-	for (int i = 0; i < materialBuffs.size(); ++i)
-	{
-		// リソース作成
-		result = dev->CreateCommittedResource(
-			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
-			D3D12_HEAP_FLAG_NONE,
-			&CD3DX12_RESOURCE_DESC::Buffer(size),
-			D3D12_RESOURCE_STATE_GENERIC_READ,
-			nullptr,
-			IID_PPV_ARGS(&materialBuffs[i]));
-
-		PMDMaterialData* matMap = nullptr;
-		// マップする
-		result = materialBuffs[i]->Map(0, nullptr, (void**)& matMap);
-		// 着色
-		matMap->diffuseColor = pmdLoader->GetMatDatas()[i].diffuseColor;		// 減光色
-		matMap->specularColor = pmdLoader->GetMatDatas()[i].specularColor;	// 光沢色
-		matMap->mirrorColor = pmdLoader->GetMatDatas()[i].mirrorColor;		// 環境色
-
-		// アンマップ
-		materialBuffs[i]->Unmap(0, nullptr);
-		cbvDesc.BufferLocation = materialBuffs[i]->GetGPUVirtualAddress();
-
-		auto hptr = dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-
-		// テクスチャがなければ、作った白テクスチャを使う。あれば、それを使う
-		auto image = whiteTexBuff;
-		auto spa = blackTexBuff;
-		auto sph = whiteTexBuff;
-		if (strlen(pmdLoader->GetModelTexturesPath()[i].c_str()) > 0)
-		{
-			// とりあえず目が見たいから仮実装
-			std::string texFileName = pmdLoader->GetModelTexturesPath()[i];
-			if (count(texFileName.begin(), texFileName.end(), '*') > 0)
-			{
-				auto namepair = SplitFileName(texFileName);
-				if (GetExtension(namepair.first.c_str()) == "sph" || GetExtension(namepair.first.c_str()) == "spa")
-				{
-					texFileName = namepair.second;
-				}
-				else
-				{
-					texFileName = namepair.first;
-				}
-			}
-			auto ext = GetExtension(texFileName.c_str());
-			// ここまで仮実装
-
-			if (ext == "png" || ext == "bmp" || ext == "jpg" || ext == "tga")
-			{
-				image = modelTexBuff[i];
-			}
-			else if (ext == "spa")
-			{
-				spa = spaBuff[i];
-			}
-			else if (ext == "sph")
-			{
-				sph = sphBuff[i];
-			}
-		}
-
-		// トゥーンがあればそれを、なければデフォルトを使う
-		auto toon = gradTexBuff;
-		if (pmdLoader->GetMatDatas()[i].toonIndex != 0xff)
-		{
-			toon = toonBuff[pmdLoader->GetMatDatas()[i].toonIndex];
-		}
-
-		// マテリアルの色
-		dev->CreateConstantBufferView(&cbvDesc, handle);
-		handle.ptr += hptr;
-
-		D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-		srvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-		srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-		srvDesc.Texture2D.MipLevels = 1;
-		srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-
-		// 通常テクスチャ
-		dev->CreateShaderResourceView(image, &srvDesc, handle);
-		handle.ptr += hptr;
-
-		// 加算(spa)
-		dev->CreateShaderResourceView(spa, &srvDesc, handle);
-		handle.ptr += hptr;
-
-		// 乗算(sph)
-		dev->CreateShaderResourceView(sph, &srvDesc, handle);
-		handle.ptr += hptr;
-
-		// トゥーン(toon)
-		dev->CreateShaderResourceView(toon, &srvDesc, handle);
-		handle.ptr += hptr;
-	}
-}
-
-void Dx12Wrapper::CreateModelTexture()
-{
-	unsigned int matNum = pmdLoader->GetMatDatas().size();
-
-	modelTexBuff.resize(matNum);
-	spaBuff.resize(matNum);
-	sphBuff.resize(matNum);
-
-	for (unsigned int i = 0; i < matNum; ++i)
-	{
-		if (std::strlen(pmdLoader->GetModelTexturesPath()[i].c_str()) == 0)
-		{
-			// パスがなければ画像はないのでやらなくてよし
-			continue;
-		}
-
-		// スプリッタがある
-		std::string texFileName = pmdLoader->GetModelTexturesPath()[i];
-		if (count(texFileName.begin(), texFileName.end(), '*') > 0)
-		{
-			auto namepair = SplitFileName(texFileName);
-			if (GetExtension(namepair.first.c_str()) == "sph" || GetExtension(namepair.first.c_str()) == "spa")
-			{
-				texFileName = namepair.second;
-			}
-			else
-			{
-				texFileName = namepair.first;
-			}
-		}
-
-		auto ext = GetExtension(texFileName.c_str());
-		auto path = GetWideStringFromString(texFileName);
-
-		// 画像読み込み&書き込み
-		if (ext == "png" || ext == "bmp" || ext == "jpg" || ext == "tga")
-		{
-			modelTexBuff[i] = imageManager->Load(texFileName);
-		}
-		else if (ext == "spa")
-		{
-			spaBuff[i] = imageManager->Load(texFileName);
-		}
-		else if (ext == "sph")
-		{
-			sphBuff[i] = imageManager->Load(texFileName);
-		}
-	}
-}
-
-void Dx12Wrapper::CreateWhiteTexture()
-{
-	whiteTexBuff = CreateTextureResource(whiteTexBuff);
-
-	std::vector<unsigned char> data(4 * 4 * 4);
-	std::fill(data.begin(), data.end(), 0xff);	// 白
-
-	auto result = whiteTexBuff->WriteToSubresource(0, nullptr, data.data(), 4 * 4, 4 * 4 * 4);
-}
-
-void Dx12Wrapper::CreateBlackTexture()
-{
-	blackTexBuff = CreateTextureResource(blackTexBuff);
-
-	std::vector<unsigned char> data(4 * 4 * 4);
-	std::fill(data.begin(), data.end(), 0x00);	// 黒
-
-	auto result = blackTexBuff->WriteToSubresource(0, nullptr, data.data(), 4 * 4, 4 * 4 * 4);
-}
-
-void Dx12Wrapper::CreateGraduationTextureBuffer()
-{
-	gradTexBuff = CreateTextureResource(gradTexBuff);
-
-	struct Color
-	{
-		Color() : r(0), g(0), b(0), a(0) {}
-		Color(unsigned char inr, unsigned char ing, unsigned char inb, unsigned char ina)
-			: r(inr), g(ing), b(inb), a(ina) {}
-
-		unsigned char r, g, b, a;
-	};
-
-	std::vector<Color> data;
-	data.resize(4 * 256);
-	unsigned char brightness = 255;
-	for (auto it = data.begin(); it != data.end(); it += 4)
-	{
-		std::fill_n(it, 4, Color(brightness, brightness, brightness, 0xff));
-		--brightness;
-	}
-
-	auto result = gradTexBuff->WriteToSubresource(0, nullptr, data.data(), 4 * sizeof(Color), data.size() * sizeof(Color));
-}
-
-void Dx12Wrapper::CreateToonTexture()
-{
-	std::vector<DirectX::TexMetadata> metadata = {};
-	std::vector<DirectX::ScratchImage> toon;
-
-	toonBuff.resize(10);
-	metadata.resize(10);
-	toon.resize(10);
-
-	// トゥーン読み込み&書き込み
-	for (int i = 0; i < toon.size(); i++)
-	{
-		size_t spoint = modelPath.rfind("/");		// "/"の場所を探る
-		std::string modelToon = modelPath.substr(0, spoint + 1);
-		std::string s = GetToonPathFromIndex(modelToon, i);
-		auto path = GetWideStringFromString(s);
-		
-		// 読み込み
-		auto result = DirectX::LoadFromWICFile(path.c_str(), DirectX::WIC_FLAGS_NONE, &metadata[i], toon[i]);
-
-		toonBuff[i] = CreateTextureResource(toonBuff[i], metadata[i].width, metadata[i].height, metadata[i].arraySize);
-
-		// テクスチャ書き込み
-		result = toonBuff[i]->WriteToSubresource(
-			0,
-			nullptr,
-			toon[i].GetPixels(),
-			metadata[i].width * 4,
-			toon[i].GetPixelsSize());
-
-		// 書き込んだら用済みなので解放
-		toon[i].Release();
-	}
-}
-
-std::string Dx12Wrapper::GetToonPathFromIndex(const std::string& folder, int idx)
-{
-	std::string filename = pmdLoader->GetToonTexNames()[idx];
-	std::string path = "toon/";
-	path += filename;
-
-	// ファイルシステムオブジェクトへのパスが有効かどうかを判断する
-	if (PathFileExistsA(path.c_str()))
-	{
-		return path;
-	}
-	else
-	{
-		return folder + filename;
-	}
-}
-
-std::wstring Dx12Wrapper::GetWideStringFromString(std::string& str)
-{
-	// 呼び出し1回目(文字列数を得る)
-	auto bsize = MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED | MB_ERR_INVALID_CHARS,
-									str.c_str(), -1, nullptr, 0);
-
-	// stringのwchar_t版, 得られた文字列数でリサイズしておく
-	std::wstring wstr;
-	wstr.resize(bsize);
-
-	// 呼び出し2回目(確保済のwstrに変換文字列をコピー)
-	bsize = MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED | MB_ERR_INVALID_CHARS,
-									str.c_str(), -1, &wstr[0], bsize);
-
-	return wstr;
-}
-
 Dx12Wrapper::Dx12Wrapper(HWND hwnd)
 {
 #ifdef _DEBUG
@@ -763,32 +373,14 @@ Dx12Wrapper::Dx12Wrapper(HWND hwnd)
 	result = dev->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, cmdAllocator, nullptr, IID_PPV_ARGS(&cmdList));
 	// フェンスの作成
 	result = dev->CreateFence(fenceValue, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence));
-
-	result = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
-
-	D3D12_DESCRIPTOR_HEAP_DESC descHeapDesc = {};
-	descHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-	descHeapDesc.NodeMask = 0;
-	descHeapDesc.NumDescriptors = 1;
-	descHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-
-	result = dev->CreateDescriptorHeap(&descHeapDesc, IID_PPV_ARGS(&rgstDescriptorHeap));
-
-	imageManager.reset(new ImageManager());
-
+	
 	//modelPath = "model/vocaloid/初音ミク.pmd";
-	modelPath = "model/vocaloid/初音ミクmetal.pmd";
-	//modelPath = "model/vocaloid/巡音ルカ.pmd";
+	//modelPath = "model/vocaloid/初音ミクmetal.pmd";
+	modelPath = "model/vocaloid/巡音ルカ.pmd";
 	//modelPath = "model/yayoi/やよいヘッド_カジュアル（体x0.96）改造.pmd";
 	//modelPath = "model/hibiki/我那覇響v1.pmd";
-	pmdLoader.reset(new PMDLoader(modelPath));
+	pmdManager.reset(new PMDManager(modelPath));
 
-	CreateModelTexture();
-	CreateWhiteTexture();
-	CreateBlackTexture();
-	CreateGraduationTextureBuffer();
-	CreateToonTexture();
-	InitMaterials();
 	CreateDepthBuff();
 	
 	CreateVertexBuffer();
@@ -796,14 +388,11 @@ Dx12Wrapper::Dx12Wrapper(HWND hwnd)
 	InitShader();
 
 
-	InitConstants();
-
 	cmdList->Close();
 }
 
 Dx12Wrapper::~Dx12Wrapper()
 {
-	rgstDescriptorHeap->Release();
 	cmdAllocator->Release();
 	cmdList->Release();
 	cmdQueue->Release();
@@ -822,34 +411,8 @@ Dx12Wrapper::~Dx12Wrapper()
 		backBuffer->Release();
 	}
 
-	constBuff->Release();
 	depthBuff->Release();
 	dsvHeap->Release();
-	matDescriptorHeap->Release();
-
-	for (int i = 0; i < materialBuffs.size(); ++i)
-	{
-		materialBuffs[i]->Release();
-		if (modelTexBuff[i] != nullptr)
-		{
-			modelTexBuff[i]->Release();
-		}
-		if (spaBuff[i] != nullptr)
-		{
-			spaBuff[i]->Release();
-		}
-		if (sphBuff[i] != nullptr)
-		{
-			sphBuff[i]->Release();
-		}
-	}
-	whiteTexBuff->Release();
-	blackTexBuff->Release();
-	gradTexBuff->Release();
-	for (auto& toon : toonBuff)
-	{
-		toon->Release();
-	}
 }
 
 void Dx12Wrapper::Update()
@@ -906,6 +469,8 @@ void Dx12Wrapper::Update()
 			angle.y = -0.01f;
 		}
 	}
+
+	auto m = Dx12Constants::Instance().GetMappedMatrix();
 	m->world *= DirectX::XMMatrixTranslation(pos.x, pos.y, pos.z);
 	m->world *= DirectX::XMMatrixRotationY(angle.x);	// 回転
 	m->world *= DirectX::XMMatrixRotationX(angle.y);
@@ -922,7 +487,7 @@ void Dx12Wrapper::Draw()
 
 	auto dev = Dx12Device::Instance().GetDevice();
 	auto heapStart = rtvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
-	bbIdx = swapChain->GetCurrentBackBufferIndex();		// ﾊﾞｯｸﾊﾞｯﾌｧｲﾝﾃﾞｯｽｸを調べる
+	bbIdx = swapChain->GetCurrentBackBufferIndex();		// バックバッファインデックスを調べる
 	heapStart.ptr += bbIdx * dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 	float clearColor[] = { 1.0f, 1.0f, 1.0f, 1.0f };	// クリアカラー設定
 	cmdList->OMSetRenderTargets(1, &heapStart, false, &dsvHeap->GetCPUDescriptorHandleForHeapStart());		// レンダーターゲット設定
@@ -934,27 +499,8 @@ void Dx12Wrapper::Draw()
 	// 画面のクリア(これも書き込みに入る)
 	cmdList->ClearRenderTargetView(heapStart, clearColor, 0, nullptr);	// クリア
 
-	cmdList->SetDescriptorHeaps(1, &rgstDescriptorHeap);
-	cmdList->SetGraphicsRootDescriptorTable(0, rgstDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
-
-	cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	cmdList->IASetVertexBuffers(0, 1, &pmdLoader->GetVbView());
-	cmdList->IASetIndexBuffer(&pmdLoader->GetIbView());
-
-
 	// モデルの描画
-	unsigned int offset = 0;
-	cmdList->SetDescriptorHeaps(1, &matDescriptorHeap);
-	auto handle = matDescriptorHeap->GetGPUDescriptorHandleForHeapStart();
-	auto hptr = dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-	for (auto& mat : pmdLoader->GetMatDatas())
-	{
-		cmdList->SetGraphicsRootDescriptorTable(1, handle);
-		handle.ptr += hptr * 5;
-		cmdList->DrawIndexedInstanced(mat.faceVertCount, 1, offset, 0, 0);
-		offset += mat.faceVertCount;
-	}
-
+	pmdManager->Draw(cmdList);
 
 	// バリアのセット
 	SetBarrier();

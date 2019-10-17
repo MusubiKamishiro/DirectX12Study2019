@@ -128,18 +128,20 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Application.cpp" />
+    <ClCompile Include="Dx12Constants.cpp" />
     <ClCompile Include="Dx12Device.cpp" />
     <ClCompile Include="Dx12Wrapper.cpp" />
     <ClCompile Include="ImageManager.cpp" />
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="PMDLoader.cpp" />
+    <ClCompile Include="PMDManager.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Application.h" />
+    <ClInclude Include="Dx12Constants.h" />
     <ClInclude Include="Dx12Device.h" />
     <ClInclude Include="Dx12Wrapper.h" />
     <ClInclude Include="ImageManager.h" />
-    <ClInclude Include="PMDLoader.h" />
+    <ClInclude Include="PMDManager.h" />
     <ClInclude Include="resource.h" />
   </ItemGroup>
   <ItemGroup>

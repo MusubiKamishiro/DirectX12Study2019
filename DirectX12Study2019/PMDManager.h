@@ -6,6 +6,9 @@
 #include <array>
 #include <string>
 
+class ImageManager;
+
+
 // PMDのヘッダファイル
 struct PMD
 {
@@ -53,8 +56,8 @@ struct PMDBoneData
 };
 
 
-///PMDの読み込みを行うクラス
-class PMDLoader
+///PMDの読み込みと描画を行うクラス
+class PMDManager
 {
 private:
 	std::vector<char> vertexDatas;				// 頂点データ
@@ -69,24 +72,68 @@ private:
 	D3D12_VERTEX_BUFFER_VIEW vbView = {};	// 頂点バッファビュー
 	D3D12_INDEX_BUFFER_VIEW ibView = {};	// インデックスバッファビュー
 
-	// モデルのテクスチャのパスを獲得
-	std::string GetModelTexturePath(const std::string& modelpath, const char* texpath);
+	// PMDデータの読み込み
+	void Load(const std::string& filepath);
 
 	// ビューの作成
 	void CreateView();
 
+	// モデルのテクスチャの作成
+	void CreateModelTexture();
+	std::vector<ID3D12Resource*> modelTexBuff;	// 通常テクスチャ
+	std::vector<ID3D12Resource*> spaBuff;		// 加算テクスチャ
+	std::vector<ID3D12Resource*> sphBuff;		// 乗算テクスチャ
+	// 白テクスチャ作成
+	void CreateWhiteTexture();
+	ID3D12Resource* whiteTexBuff;
+	// 黒テクスチャ作成
+	void CreateBlackTexture();
+	ID3D12Resource* blackTexBuff;
+	// トゥーンがなかった時に使用するテクスチャ作成
+	void CreateGraduationTextureBuffer();
+	ID3D12Resource* gradTexBuff;
+	// トゥーンテクスチャ作成
+	void CreateToonTexture(const std::string& filepath);
+	std::vector<ID3D12Resource*> toonBuff;
+
+	// マテリアルの初期化
+	void InitMaterials();
+	ID3D12DescriptorHeap* matDescriptorHeap;	// マテリアル用デスクリプタヒープ
+	std::vector<ID3D12Resource*> materialBuffs;	// マテリアル用バッファ(マテリアル1つにつき1個)
+
+	std::shared_ptr<ImageManager> imageManager;
+
+	// モデルのテクスチャのパスを獲得
+	std::string GetModelTexturePath(const std::string& modelpath, const char* texpath);
+
+	// 拡張子を取得する
+	//@param path 対象パスの文字列
+	//@return 拡張子
+	std::string GetExtension(const char* path);
+
+	//テクスチャのパスをセパレータ文字で分離する
+	//@param path 対象のパス文字列
+	//@param splitter 区切り文字
+	//@return 分離前後の文字列ペア
+	std::pair<std::string, std::string> SplitFileName(const std::string& path, const char splitter = '*');
+
+	// string(マルチバイト文字列)からwstring(ワイド文字列)を得る
+	//@param str マルチバイト文字列
+	//@return 変換されたワイド文字列
+	std::wstring GetWideStringFromString(std::string& str);
+
+	// テクスチャリソースの作成
+	ID3D12Resource* CreateTextureResource(ID3D12Resource* buff, const unsigned int width = 4,
+		const unsigned int height = 4, const unsigned int arraySize = 1);
+
+	// インデックスを元にトゥーンのパスをもらう
+	std::string GetToonPathFromIndex(const std::string& folder, int idx);
+
+
 public:
-	PMDLoader(const std::string& filepath);
-	~PMDLoader();
+	PMDManager(const std::string& filepath);
+	~PMDManager();
 
-	const std::vector<char>& GetVertexDatas()const;
-	const std::vector<unsigned short>& GetFaceVertices();
-	const std::vector<PMDMaterialData>& GetMatDatas();
-	const std::vector<PMDBoneData>& GetBones();
-	const std::array<char[100], 10>& GetToonTexNames();
-	const std::vector<std::string>& GetModelTexturesPath();
-
-	const D3D12_VERTEX_BUFFER_VIEW& GetVbView()const;
-	const D3D12_INDEX_BUFFER_VIEW& GetIbView()const;
+	void Draw(ID3D12GraphicsCommandList* cmdList);
 };
 
