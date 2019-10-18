@@ -2,6 +2,7 @@
 #include <d3d12.h>
 #include <DirectXMath.h>
 
+#include <map>
 #include <vector>
 #include <array>
 #include <string>
@@ -52,7 +53,15 @@ struct PMDBoneData
 	unsigned short tailPosBoneIndex;	// tail位置のボーン番号(チェーン末端の場合は0xFFFF)	// 親：子は1：多なので、主に位置決め用
 	unsigned char boneType;				// ボーンの種類
 	unsigned short ikParentBoneIndex;	// IKボーン番号(影響IKボーン。ない場合は0)
-	float boneHeadPos[3];				// ボーンのヘッドの位置		// x, y, z
+	DirectX::XMFLOAT3 boneHeadPos;		// ボーンのヘッドの位置		// x, y, z
+};
+
+struct BoneNode
+{
+	int boneIdx;						// ボーン行列配列と対応
+	DirectX::XMFLOAT3 startPos;			// ボーン始点(関節初期座標)
+	DirectX::XMFLOAT3 endPos;			// ボーン終点(次の関節座標)
+	std::vector<BoneNode*> children;	// 子供たちへのリンク
 };
 
 
@@ -71,6 +80,10 @@ private:
 	ID3D12Resource* indexBuffer = nullptr;	// インデックスバッファ
 	D3D12_VERTEX_BUFFER_VIEW vbView = {};	// 頂点バッファビュー
 	D3D12_INDEX_BUFFER_VIEW ibView = {};	// インデックスバッファビュー
+
+	std::vector<DirectX::XMMATRIX> boneMatrices;	// ボーン行列転送用
+	std::map<std::string, BoneNode> boneMap;		// ボーンマップ
+
 
 	// PMDデータの読み込み
 	void Load(const std::string& filepath);
@@ -100,6 +113,11 @@ private:
 	void InitMaterials();
 	ID3D12DescriptorHeap* matDescriptorHeap;	// マテリアル用デスクリプタヒープ
 	std::vector<ID3D12Resource*> materialBuffs;	// マテリアル用バッファ(マテリアル1つにつき1個)
+
+	// 骨作成
+	void CreateBone();
+	ID3D12Resource* boneBuff;					// ボーン用バッファ
+	ID3D12DescriptorHeap* boneHeap;				// ボーン用ヒープ
 
 	std::shared_ptr<ImageManager> imageManager;
 

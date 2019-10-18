@@ -162,7 +162,7 @@ void Dx12Wrapper::InitShader()
 
 void Dx12Wrapper::InitRootSignatur()
 {
-	D3D12_DESCRIPTOR_RANGE descRange[3] = {};
+	D3D12_DESCRIPTOR_RANGE descRange[4] = {};
 	// "b0"	wvp
 	descRange[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
 	descRange[0].BaseShaderRegister = 0;	// レジスタ番号
@@ -179,9 +179,13 @@ void Dx12Wrapper::InitRootSignatur()
 	descRange[2].BaseShaderRegister = 0;	// レジスタ番号
 	descRange[2].NumDescriptors = 4;		// 1回で読む数
 	descRange[2].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
-	
+	// "b2" 骨
+	descRange[3].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
+	descRange[3].BaseShaderRegister = 2;	// レジスタ番号
+	descRange[3].NumDescriptors = 1;		// 1回で読む数
+	descRange[3].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
-	D3D12_ROOT_PARAMETER rootParam[2] = {};
+	D3D12_ROOT_PARAMETER rootParam[3] = {};
 	rootParam[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
 	rootParam[0].DescriptorTable.NumDescriptorRanges = 1;		// レンジの数
 	rootParam[0].DescriptorTable.pDescriptorRanges = &descRange[0];	// 対応するレンジへのポインタ
@@ -191,6 +195,11 @@ void Dx12Wrapper::InitRootSignatur()
 	rootParam[1].DescriptorTable.NumDescriptorRanges = 2;		// レンジの数
 	rootParam[1].DescriptorTable.pDescriptorRanges = &descRange[1];	// 対応するレンジへのポインタ
 	rootParam[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+
+	rootParam[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+	rootParam[2].DescriptorTable.NumDescriptorRanges = 1;		// レンジの数
+	rootParam[2].DescriptorTable.pDescriptorRanges = &descRange[3];	// 対応するレンジへのポインタ
+	rootParam[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
 
 	// サンプラの設定
@@ -210,7 +219,7 @@ void Dx12Wrapper::InitRootSignatur()
 
 	D3D12_ROOT_SIGNATURE_DESC rsd = {};
 	rsd.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
-	rsd.NumParameters = 2;
+	rsd.NumParameters = 3;
 	rsd.NumStaticSamplers = 1;
 	rsd.pParameters = &rootParam[0];
 	rsd.pStaticSamplers = &samplerDesc;
@@ -233,6 +242,8 @@ void Dx12Wrapper::InitPipelineState()
 												D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
 		{"TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT,
 												D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+		{ "BONENO", 0, DXGI_FORMAT_R16G16_UINT, 0, D3D12_APPEND_ALIGNED_ELEMENT,
+												D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
 	};
 
 	// パイプラインステートを作る
@@ -374,9 +385,9 @@ Dx12Wrapper::Dx12Wrapper(HWND hwnd)
 	// フェンスの作成
 	result = dev->CreateFence(fenceValue, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence));
 	
-	//modelPath = "model/vocaloid/初音ミク.pmd";
+	modelPath = "model/vocaloid/初音ミク.pmd";
 	//modelPath = "model/vocaloid/初音ミクmetal.pmd";
-	modelPath = "model/vocaloid/巡音ルカ.pmd";
+	//modelPath = "model/vocaloid/巡音ルカ.pmd";
 	//modelPath = "model/yayoi/やよいヘッド_カジュアル（体x0.96）改造.pmd";
 	//modelPath = "model/hibiki/我那覇響v1.pmd";
 	pmdManager.reset(new PMDManager(modelPath));

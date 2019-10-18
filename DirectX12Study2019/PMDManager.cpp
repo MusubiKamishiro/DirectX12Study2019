@@ -23,6 +23,8 @@ PMDManager::PMDManager(const std::string& filepath)
 	CreateToonTexture(filepath);
 	CreateGraduationTextureBuffer();
 	InitMaterials();
+
+	CreateBone();
 }
 
 PMDManager::~PMDManager()
@@ -39,6 +41,8 @@ PMDManager::~PMDManager()
 	{
 		mat->Release();
 	}
+	boneBuff->Release();
+	boneHeap->Release();
 }
 
 void PMDManager::Load(const std::string& filepath)
@@ -453,6 +457,66 @@ void PMDManager::InitMaterials()
 		dev->CreateShaderResourceView(toon, &srvDesc, handle);
 		handle.ptr += hptr;
 	}
+}
+
+void PMDManager::CreateBone()
+{
+	boneMatrices.resize(bones.size());
+	std::fill(boneMatrices.begin(), boneMatrices.end(), DirectX::XMMatrixIdentity());
+
+	// マップ情報を構築
+	for (int idx = 0; idx < bones.size(); idx++)
+	{
+		auto& b = bones[idx];
+		auto& BNode = boneMap[b.boneName];
+		BNode.boneIdx = idx;
+		BNode.startPos = b.boneHeadPos;
+		BNode.endPos = bones[b.tailPosBoneIndex].boneHeadPos;
+	}
+	for (auto& b : boneMap)
+	{
+		if (bones[b.second.boneIdx].parentBoneIndex >= bones.size())
+		{
+			// 子供がいないならやり直し
+			continue;
+		}
+		auto parentName = bones[bones[b.second.boneIdx].parentBoneIndex].boneName;
+		boneMap[parentName].children.push_back(&b.second);		// 親の後ろに子供を追加する
+	}
+
+	// ヒープの設定
+	D3D12_DESCRIPTOR_HEAP_DESC descHeapDesc = {};
+	descHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+	descHeapDesc.NodeMask = 0;
+	descHeapDesc.NumDescriptors = 1;
+	descHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+
+	auto dev = Dx12Device::Instance().GetDevice();
+	// ヒープ作成
+	auto result = dev->CreateDescriptorHeap(&descHeapDesc, IID_PPV_ARGS(&boneHeap));
+
+	size_t size = sizeof(DirectX::XMMATRIX) * boneMatrices.size();
+	size = (size + 0xff) & ~0xff;		// 256アライメントに合わせている
+
+	result = dev->CreateCommittedResource(
+		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+		D3D12_HEAP_FLAGS::D3D12_HEAP_FLAG_NONE,
+		&CD3DX12_RESOURCE_DESC::Buffer(size),
+		D3D12_RESOURCE_STATE_GENERIC_READ,
+		nullptr,
+		IID_PPV_ARGS(&boneBuff));
+
+	D3D12_CONSTANT_BUFFER_VIEW_DESC desc = {};
+	desc.BufferLocation = boneBuff->GetGPUVirtualAddress();
+	desc.SizeInBytes = size;
+
+	auto handle = boneHeap->GetCPUDescriptorHandleForHeapStart();
+	dev->CreateConstantBufferView(&desc, handle);
+
+	DirectX::XMMATRIX* matMap = nullptr;
+	result = boneBuff->Map(0, nullptr, (void**)& matMap);
+	std::copy(boneMatrices.begin(), boneMatrices.end(), matMap);
+
 }
 
 std::string PMDManager::GetModelTexturePath(const std::string& modelpath, const char* texpath)

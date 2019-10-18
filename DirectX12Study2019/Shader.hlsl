@@ -17,7 +17,7 @@ cbuffer mat : register(b0)
 	matrix lightVP;		// ライトビュープロジェクション
 };
 
-// 定数ﾊﾞｯﾌｧ(1番)
+// 定数バッファ(1番)
 cbuffer material : register(b1)
 {
 	float3 diffuse;		// ディフューズカラー(減光色)
@@ -25,6 +25,11 @@ cbuffer material : register(b1)
 	float3 mirror;		// アンビエントカラー(環境色)
 };
 
+// ボーン行列(2番)
+cbuffer bones : register(b2)
+{
+	matrix boneMats[512];
+}
 
 struct Output
 {
@@ -32,17 +37,18 @@ struct Output
 	float4 svpos	: SV_POSITION;	// システム用頂点座標
 	float4 normal	: NORMAL;		// 法線ベクトル
 	float2 uv		: TEXCOORD;		// UV値
+	float2 boneno	: BONENO;
 };
 
 // 頂点シェーダ
-Output vs(float4 pos : POSITION, float4 normal : NORMAL, float2 uv : TEXCOORD)
+Output vs(float4 pos : POSITION, float4 normal : NORMAL, float2 uv : TEXCOORD, min16uint2 boneno : BONENO)
 {
 	Output output;
 	output.pos = mul(world, pos);
-	//output.svpos = pos;
 	output.svpos = mul(mul(viewProj, world), pos);	// 2次元上
 	output.uv = uv;
 	output.normal = normal;
+	output.boneno = boneno /*/ 64.0*/;
 
 	return output;
 }
@@ -66,7 +72,8 @@ float4 ps(Output output) : SV_TARGET
 	float3 texColor = tex.Sample(smp, output.uv) * sph.Sample(smp, spuv).rgb + spa.Sample(smp, spuv).rgb;;
 	float3 matColor = toonDif.rgb * diffuse + specular + (mirror * 0.5f);
 
-	return float4(float3(brightness, brightness, brightness) * texColor * diffuse
+	return float4((float2)(output.boneno % 2), 0, 1);
+	return float4(float3(brightness, brightness, brightness) * toonDif.rgb * texColor * diffuse
 		/** tex.Sample(smp, output.uv).rgb * sph.Sample(smp, spuv).rgb + spa.Sample(smp, spuv).rgb*/ + float3(texColor * mirror), 1.0f);
 
 	return float4(texColor * matColor * float3(brightness, brightness, brightness), 1.0f);
