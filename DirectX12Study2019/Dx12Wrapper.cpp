@@ -73,7 +73,7 @@ void Dx12Wrapper::CreateRenderTarget()
 	backBuffers.resize(swapCDesc.BufferCount);
 	// レンダーターゲットの作成
 	D3D12_CPU_DESCRIPTOR_HANDLE cpuDescH = rtvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
-	// 各ﾃﾞｽｸﾘﾌﾟﾀｰの使用するｻｲｽﾞを計算しとく
+	// 各デスクリプターの使用するサイズを計算しとく
 	auto rtvSize = dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 	for (int i = 0; i < static_cast<int>(swapCDesc.BufferCount); ++i)
 	{
@@ -244,6 +244,8 @@ void Dx12Wrapper::InitPipelineState()
 												D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
 		{ "BONENO", 0, DXGI_FORMAT_R16G16_UINT, 0, D3D12_APPEND_ALIGNED_ELEMENT,
 												D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+		{ "WEIGHT", 0, DXGI_FORMAT_R8_UINT, 0, D3D12_APPEND_ALIGNED_ELEMENT,
+												D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
 	};
 
 	// パイプラインステートを作る
@@ -313,18 +315,17 @@ void Dx12Wrapper::CreateDepthBuff()
 		&_depthClearValue,
 		IID_PPV_ARGS(&depthBuff));
 	
+	D3D12_DESCRIPTOR_HEAP_DESC dsvHeapDesc = {};	// 特に設定の必要はない
+	dsvHeapDesc.NumDescriptors = 1;
+	dsvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
+	result = dev->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(&dsvHeap));
 
-	D3D12_DESCRIPTOR_HEAP_DESC _dsvHeapDesc = {};	// 特に設定の必要はない
-	_dsvHeapDesc.NumDescriptors = 1;
-	_dsvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
-	result = dev->CreateDescriptorHeap(&_dsvHeapDesc, IID_PPV_ARGS(&dsvHeap));
-
-	D3D12_DEPTH_STENCIL_VIEW_DESC _dsvDesc = {};
-	_dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
-	_dsvDesc.Format = DXGI_FORMAT_D32_FLOAT;
+	D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc = {};
+	dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
+	dsvDesc.Format = DXGI_FORMAT_D32_FLOAT;
 
 	// 深度バッファビューの作成
-	dev->CreateDepthStencilView(depthBuff, &_dsvDesc, dsvHeap->GetCPUDescriptorHandleForHeapStart());
+	dev->CreateDepthStencilView(depthBuff, &dsvDesc, dsvHeap->GetCPUDescriptorHandleForHeapStart());
 }
 
 void Dx12Wrapper::ClearCmd(ID3D12PipelineState* pipelinestate, ID3D12RootSignature* rootsignature)

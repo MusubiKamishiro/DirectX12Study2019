@@ -22,9 +22,9 @@ struct PMD
 // PMDの頂点データ
 struct PMDVertexData
 {
-	float pos[3];				// x, y, z					// 座標
-	float normalVec[3];			// nx, ny, nz				// 法線ベクトル
-	float uv[2];				// u, v						// UV座標			// MMDは頂点UV
+	DirectX::XMFLOAT3 pos;		// x, y, z					// 座標
+	DirectX::XMFLOAT3 normalVec;// nx, ny, nz				// 法線ベクトル
+	DirectX::XMFLOAT2 uv;		// u, v						// UV座標			// MMDは頂点UV
 	unsigned short boneNum[2];	// ボーン番号1、番号2		// モデル変形(頂点移動)時に影響
 	unsigned char boneWeight;	// ボーン1に与える影響度	// min:0 max:100	// ボーン2への影響度は、(100 - bone_weight)
 	unsigned char edgeFlag;		// 0:通常、1:エッジ無効		// エッジ(輪郭)が有効の場合
@@ -69,6 +69,8 @@ struct BoneNode
 class PMDManager
 {
 private:
+	// PMDデータの読み込み
+	void Load(const std::string& filepath);
 	std::vector<char> vertexDatas;				// 頂点データ
 	std::vector<unsigned short> faceVertices;	// 面頂点データ
 	std::vector<PMDMaterialData> matDatas;		// マテリアルデータ
@@ -76,20 +78,12 @@ private:
 	std::array<char[100], 10> toonTexNames;		// トゥーンテクスチャの名前, 固定
 	std::vector<std::string> modelTexturesPath;	// モデルに張り付けるテクスチャのパス(中身がないときもある)
 
+	// ビューの作成
+	void CreateView();
 	ID3D12Resource* vertexBuffer = nullptr;	// 頂点バッファ
 	ID3D12Resource* indexBuffer = nullptr;	// インデックスバッファ
 	D3D12_VERTEX_BUFFER_VIEW vbView = {};	// 頂点バッファビュー
 	D3D12_INDEX_BUFFER_VIEW ibView = {};	// インデックスバッファビュー
-
-	std::vector<DirectX::XMMATRIX> boneMatrices;	// ボーン行列転送用
-	std::map<std::string, BoneNode> boneMap;		// ボーンマップ
-
-
-	// PMDデータの読み込み
-	void Load(const std::string& filepath);
-
-	// ビューの作成
-	void CreateView();
 
 	// モデルのテクスチャの作成
 	void CreateModelTexture();
@@ -116,8 +110,11 @@ private:
 
 	// 骨作成
 	void CreateBone();
-	ID3D12Resource* boneBuff;					// ボーン用バッファ
-	ID3D12DescriptorHeap* boneHeap;				// ボーン用ヒープ
+	DirectX::XMMATRIX* matMap = nullptr;
+	ID3D12Resource* boneBuff;		// ボーン用バッファ
+	ID3D12DescriptorHeap* boneHeap;	// ボーン用ヒープ
+	std::vector<DirectX::XMMATRIX> boneMatrices;	// ボーン行列転送用
+	std::map<std::string, BoneNode> boneMap;		// ボーンマップ
 
 	std::shared_ptr<ImageManager> imageManager;
 
@@ -146,6 +143,13 @@ private:
 
 	// インデックスを元にトゥーンのパスをもらう
 	std::string GetToonPathFromIndex(const std::string& folder, int idx);
+
+	// 骨の回転を子まで伝える
+	void RecursiveMatrixMultply(BoneNode& node, DirectX::XMMATRIX& inMat);
+
+	// 骨を回転させる
+	//@param quaternion
+	void RotateBones(const char* bonename, const DirectX::XMFLOAT4& quaternion);
 
 
 public:

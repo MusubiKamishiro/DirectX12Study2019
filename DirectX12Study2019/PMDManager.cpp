@@ -25,6 +25,21 @@ PMDManager::PMDManager(const std::string& filepath)
 	InitMaterials();
 
 	CreateBone();
+
+	//RotateBones("左ひじ", DirectX::XM_PIDIV4);
+	//auto& bonenode = boneMap["左ひじ"];
+	//auto vec = DirectX::XMLoadFloat3(&bonenode.startPos);	// XMLoadFloat3...XMFLOAT3をXMVECTORに変換する
+
+	//boneMatrices[bonenode.boneIdx] = DirectX::XMMatrixTranslationFromVector(DirectX::XMVectorScale(vec, -1))
+	//	* DirectX::XMMatrixRotationZ(DirectX::XM_PIDIV2) * DirectX::XMMatrixTranslationFromVector(vec);
+
+	//// ツリーをトラバース
+	//DirectX::XMMATRIX rootmat = DirectX::XMMatrixIdentity();
+
+	//RecursiveMatrixMultply(boneMap["センター"], rootmat);
+
+	//// マップを更新
+	//std::copy(boneMatrices.begin(), boneMatrices.end(), matMap);
 }
 
 PMDManager::~PMDManager()
@@ -513,7 +528,6 @@ void PMDManager::CreateBone()
 	auto handle = boneHeap->GetCPUDescriptorHandleForHeapStart();
 	dev->CreateConstantBufferView(&desc, handle);
 
-	DirectX::XMMATRIX* matMap = nullptr;
 	result = boneBuff->Map(0, nullptr, (void**)& matMap);
 	std::copy(boneMatrices.begin(), boneMatrices.end(), matMap);
 
@@ -613,6 +627,36 @@ std::string PMDManager::GetToonPathFromIndex(const std::string& folder, int idx)
 	}
 }
 
+void PMDManager::RecursiveMatrixMultply(BoneNode& node, DirectX::XMMATRIX& inMat)
+{
+	boneMatrices[node.boneIdx] *= inMat;
+	for (auto& cnode : node.children)
+	{
+		RecursiveMatrixMultply(*cnode, boneMatrices[node.boneIdx]);
+	}
+}
+
+void PMDManager::RotateBones(const char* bonename, const DirectX::XMFLOAT4& quaternion)
+{
+	auto& bonenode = boneMap[bonename];
+	auto vec = DirectX::XMLoadFloat3(&bonenode.startPos);	// XMLoadFloat3...XMFLOAT3をXMVECTORに変換する
+	auto q = DirectX::XMLoadFloat4(&quaternion);
+
+	boneMatrices[bonenode.boneIdx] = DirectX::XMMatrixTranslationFromVector(DirectX::XMVectorScale(vec, -1)) 
+										* DirectX::XMMatrixRotationQuaternion(q) * DirectX::XMMatrixTranslationFromVector(vec);
+
+
+
+	// ツリーをトラバース
+	DirectX::XMMATRIX rootmat = DirectX::XMMatrixIdentity();
+
+	RecursiveMatrixMultply(boneMap["センター"], rootmat);
+
+	// マップを更新
+	std::copy(boneMatrices.begin(), boneMatrices.end(), matMap);
+
+}
+
 void PMDManager::Draw(ID3D12GraphicsCommandList* cmdList)
 {
 	auto rgstDescriptorHeap = Dx12Constants::Instance().GetRgstDescriptorHeap();
@@ -623,6 +667,10 @@ void PMDManager::Draw(ID3D12GraphicsCommandList* cmdList)
 	cmdList->IASetVertexBuffers(0, 1, &vbView);
 	cmdList->IASetIndexBuffer(&ibView);
 
+	// 骨をセット
+	cmdList->SetDescriptorHeaps(1, &boneHeap);
+	auto boneHeapHandle = boneHeap->GetGPUDescriptorHandleForHeapStart();
+	cmdList->SetGraphicsRootDescriptorTable(2, boneHeapHandle);	// 第一引数はｽﾛｯﾄ番号
 
 	// モデルの描画
 	unsigned int offset = 0;
