@@ -9,6 +9,7 @@
 #include <memory>
 
 class PMDManager;
+class VMDLoader;
 
 
 struct Vector3
@@ -94,8 +95,13 @@ private:
 
 	// PMD関連
 	std::string modelPath;	// モデルのパス
-	// PMDを読み込み
 	std::shared_ptr<PMDManager> pmdManager;
+
+	// VMD
+	std::shared_ptr<VMDLoader> vmdLoader;
+	std::string vmdPath;	// vmdのパス
+
+	int frame = 0;
 	
 public:
 	Dx12Wrapper(HWND hwnd);

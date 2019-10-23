@@ -17,9 +17,9 @@ Application& Application::Instance()
 // ウィンドウプロシージャ
 LRESULT WindowProcedure(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 {
-	if (msg == WM_DESTROY)	// ｳｨﾝﾄﾞｳが破棄されると呼ばれる
+	if (msg == WM_DESTROY)	// ウィンドウが破棄されると呼ばれる
 	{
-		PostQuitMessage(0);	// OSに対し「このｱﾌﾟﾘを終了する」と伝える
+		PostQuitMessage(0);	// OSに対し「このアプリを終了する」と伝える
 		return 0;
 	}
 	return DefWindowProc(hwnd, msg, wparam, lparam);	// 規定の処理を行う

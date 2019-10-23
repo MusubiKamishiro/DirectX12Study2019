@@ -7,6 +7,7 @@
 #include "Dx12Device.h"
 #include "Dx12Constants.h"
 #include "PMDManager.h"
+#include "VMDLoader.h"
 
 #pragma comment(lib,"d3d12.lib")
 #pragma comment(lib,"dxgi.lib")
@@ -266,20 +267,20 @@ void Dx12Wrapper::InitPipelineState()
 
 	// 深度ステンシル
 	gpsDesc.DepthStencilState.DepthEnable = true;
-	gpsDesc.DepthStencilState.StencilEnable = false;		// あとで
+	gpsDesc.DepthStencilState.StencilEnable = false;
 	gpsDesc.DSVFormat = DXGI_FORMAT_D32_FLOAT;				// 必須(DSV)
 	gpsDesc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;	// DSV必須
 	gpsDesc.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS;		// 小さいほうを返す
 
 	// ラスタライザ
 	gpsDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
-	gpsDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;	// 表面だけじゃなくて、裏面も描画するようにするよ
+	gpsDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;	// 表面だけじゃなくて、裏面も描画するようにする
 
 	// その他
 	gpsDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
 	gpsDesc.NodeMask = 0;
-	gpsDesc.SampleDesc.Count = 1;		// いる
-	gpsDesc.SampleDesc.Quality = 0;		// いる
+	gpsDesc.SampleDesc.Count = 1;
+	gpsDesc.SampleDesc.Quality = 0;
 	gpsDesc.SampleMask = 0xffffffff;	// 全部1
 	gpsDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;	// 三角形
 
@@ -393,6 +394,12 @@ Dx12Wrapper::Dx12Wrapper(HWND hwnd)
 	//modelPath = "model/hibiki/我那覇響v1.pmd";
 	pmdManager.reset(new PMDManager(modelPath));
 
+	//vmdPath = "motion/pose.vmd";
+	//vmdPath = "motion/charge.vmd";
+	//vmdPath = "motion/Miku.vmd";
+	vmdPath = "motion/ヤゴコロダンス.vmd";
+	vmdLoader.reset(new VMDLoader(vmdPath));
+
 	CreateDepthBuff();
 	
 	CreateVertexBuffer();
@@ -486,6 +493,11 @@ void Dx12Wrapper::Update()
 	m->world *= DirectX::XMMatrixTranslation(pos.x, pos.y, pos.z);
 	m->world *= DirectX::XMMatrixRotationY(angle.x);	// 回転
 	m->world *= DirectX::XMMatrixRotationX(angle.y);
+
+
+	pmdManager->Update(vmdLoader->GetAnimationData(), frame);
+
+	++frame;
 }
 
 void Dx12Wrapper::Draw()

@@ -7,6 +7,8 @@
 #include <array>
 #include <string>
 
+#include "VMDLoader.h"
+
 class ImageManager;
 
 
@@ -149,13 +151,17 @@ private:
 
 	// çúÇâÒì]Ç≥ÇπÇÈ
 	//@param quaternion
-	void RotateBones(const char* bonename, const DirectX::XMFLOAT4& quaternion);
+	void RotateBone(const char* bonename, const DirectX::XMFLOAT4& quaternion);
+	void RotateBone(const char* bonename, const DirectX::XMFLOAT4& q, const DirectX::XMFLOAT4& q2, float t = 0.0f);
+
+	void MotionUpdate(const std::map<std::string, std::vector<KeyFlames>>& animationdata, int frame);
 
 
 public:
 	PMDManager(const std::string& filepath);
 	~PMDManager();
 
+	void Update(const std::map<std::string, std::vector<KeyFlames>>& animationdata, int nowflame);
 	void Draw(ID3D12GraphicsCommandList* cmdList);
 };
 

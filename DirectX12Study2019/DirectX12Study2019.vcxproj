@@ -134,6 +134,7 @@
     <ClCompile Include="ImageManager.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="PMDManager.cpp" />
+    <ClCompile Include="VMDLoader.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Application.h" />
@@ -143,6 +144,7 @@
     <ClInclude Include="ImageManager.h" />
     <ClInclude Include="PMDManager.h" />
     <ClInclude Include="resource.h" />
+    <ClInclude Include="VMDLoader.h" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="DirectX12Study2019.rc" />

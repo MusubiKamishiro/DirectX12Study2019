@@ -25,21 +25,6 @@ PMDManager::PMDManager(const std::string& filepath)
 	InitMaterials();
 
 	CreateBone();
-
-	//RotateBones("左ひじ", DirectX::XM_PIDIV4);
-	//auto& bonenode = boneMap["左ひじ"];
-	//auto vec = DirectX::XMLoadFloat3(&bonenode.startPos);	// XMLoadFloat3...XMFLOAT3をXMVECTORに変換する
-
-	//boneMatrices[bonenode.boneIdx] = DirectX::XMMatrixTranslationFromVector(DirectX::XMVectorScale(vec, -1))
-	//	* DirectX::XMMatrixRotationZ(DirectX::XM_PIDIV2) * DirectX::XMMatrixTranslationFromVector(vec);
-
-	//// ツリーをトラバース
-	//DirectX::XMMATRIX rootmat = DirectX::XMMatrixIdentity();
-
-	//RecursiveMatrixMultply(boneMap["センター"], rootmat);
-
-	//// マップを更新
-	//std::copy(boneMatrices.begin(), boneMatrices.end(), matMap);
 }
 
 PMDManager::~PMDManager()
@@ -636,7 +621,7 @@ void PMDManager::RecursiveMatrixMultply(BoneNode& node, DirectX::XMMATRIX& inMat
 	}
 }
 
-void PMDManager::RotateBones(const char* bonename, const DirectX::XMFLOAT4& quaternion)
+void PMDManager::RotateBone(const char* bonename, const DirectX::XMFLOAT4& quaternion)
 {
 	auto& bonenode = boneMap[bonename];
 	auto vec = DirectX::XMLoadFloat3(&bonenode.startPos);	// XMLoadFloat3...XMFLOAT3をXMVECTORに変換する
@@ -644,8 +629,56 @@ void PMDManager::RotateBones(const char* bonename, const DirectX::XMFLOAT4& quat
 
 	boneMatrices[bonenode.boneIdx] = DirectX::XMMatrixTranslationFromVector(DirectX::XMVectorScale(vec, -1)) 
 										* DirectX::XMMatrixRotationQuaternion(q) * DirectX::XMMatrixTranslationFromVector(vec);
+}
 
+void PMDManager::RotateBone(const char* bonename, const DirectX::XMFLOAT4& q, const DirectX::XMFLOAT4& q2, float t)
+{
+	auto& bonenode = boneMap[bonename];
+	auto vec = DirectX::XMLoadFloat3(&bonenode.startPos);
+	auto quaternion = XMLoadFloat4(&q);
+	auto quaternion2 = XMLoadFloat4(&q2);
 
+	boneMatrices[bonenode.boneIdx] = DirectX::XMMatrixTranslationFromVector(DirectX::XMVectorScale(vec, -1)) *
+		DirectX::XMMatrixRotationQuaternion(DirectX::XMQuaternionSlerp(quaternion, quaternion2, t)) *
+		DirectX::XMMatrixTranslationFromVector(vec);
+}
+
+void PMDManager::MotionUpdate(const std::map<std::string, std::vector<KeyFlames>>& animationdata, int frame)
+{
+	// 最初に初期化
+	std::fill(boneMatrices.begin(), boneMatrices.end(), DirectX::XMMatrixIdentity());
+
+	// ポージング適用
+	for (auto& boneAnim : animationdata)
+	{
+		auto& keyframe = boneAnim.second;
+
+		// ラムダ式(理解して)
+		auto frameIt = std::find_if(keyframe.rbegin(), keyframe.rend(),
+			[frame](const KeyFlames& k) {return k.frameNo <= frame; });	// 現在のフレームに近い前のフレーム
+
+		if (frameIt == keyframe.rend())
+		{
+			// 対象のものがなかったらendが返ってくる
+			// 対象のものがなければやり直し
+			continue;
+		}
+		auto nextFrameIt = frameIt.base();				// 現在のフレームに近い次のフレーム
+
+		if (nextFrameIt == keyframe.end())
+		{
+			// 骨回す
+			RotateBone(boneAnim.first.c_str(), frameIt->quaternion);
+		}
+		else
+		{
+			float a = (float)frameIt->frameNo;
+			float b = (float)nextFrameIt->frameNo;
+			float t = (static_cast<float>(frame - a)) / (b - a);	// 補間
+
+			RotateBone(boneAnim.first.c_str(), frameIt->quaternion, nextFrameIt->quaternion, t);
+		}
+	}
 
 	// ツリーをトラバース
 	DirectX::XMMATRIX rootmat = DirectX::XMMatrixIdentity();
@@ -654,7 +687,11 @@ void PMDManager::RotateBones(const char* bonename, const DirectX::XMFLOAT4& quat
 
 	// マップを更新
 	std::copy(boneMatrices.begin(), boneMatrices.end(), matMap);
+}
 
+void PMDManager::Update(const std::map<std::string, std::vector<KeyFlames>>& animationdata, int nowflame)
+{
+	MotionUpdate(animationdata, nowflame);
 }
 
 void PMDManager::Draw(ID3D12GraphicsCommandList* cmdList)
