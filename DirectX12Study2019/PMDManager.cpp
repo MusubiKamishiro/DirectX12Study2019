@@ -56,11 +56,11 @@ void PMDManager::Load(const std::string& filepath)
 	assert(error == 0);
 
 	// ヘッダ読み込み
-	PMD pmdData;
-	fread(&pmdData.magic, sizeof(pmdData.magic), 1, fp);
-	fread(&pmdData.version, sizeof(pmdData.version), 1, fp);
-	fread(&pmdData.modelName, sizeof(pmdData.modelName), 1, fp);
-	fread(&pmdData.comment, sizeof(pmdData.comment), 1, fp);
+	PMDHeader pmdData;
+	fread(&pmdData.magic,		sizeof(pmdData.magic),		1, fp);
+	fread(&pmdData.version,		sizeof(pmdData.version),	1, fp);
+	fread(&pmdData.modelName,	sizeof(pmdData.modelName),	1, fp);
+	fread(&pmdData.comment,		sizeof(pmdData.comment),	1, fp);
 
 	// 頂点数読み込み
 	unsigned int vertexCount;
@@ -84,15 +84,15 @@ void PMDManager::Load(const std::string& filepath)
 	modelTexturesPath.resize(matCount);
 	for (int i = 0; i < matDatas.size(); ++i)
 	{
-		fread(&matDatas[i].diffuseColor, sizeof(matDatas[i].diffuseColor), 1, fp);
-		fread(&matDatas[i].alpha, sizeof(matDatas[i].alpha), 1, fp);
-		fread(&matDatas[i].specularity, sizeof(matDatas[i].specularity), 1, fp);
-		fread(&matDatas[i].specularColor, sizeof(matDatas[i].specularColor), 1, fp);
-		fread(&matDatas[i].mirrorColor, sizeof(matDatas[i].mirrorColor), 1, fp);
-		fread(&matDatas[i].toonIndex, sizeof(matDatas[i].toonIndex), 1, fp);
-		fread(&matDatas[i].edgeFlag, sizeof(matDatas[i].edgeFlag), 1, fp);
-		fread(&matDatas[i].faceVertCount, sizeof(matDatas[i].faceVertCount), 1, fp);
-		fread(&matDatas[i].textureFileName, sizeof(matDatas[i].textureFileName), 1, fp);
+		fread(&matDatas[i].diffuseColor,	sizeof(matDatas[i].diffuseColor),		1, fp);
+		fread(&matDatas[i].alpha,			sizeof(matDatas[i].alpha),				1, fp);
+		fread(&matDatas[i].specularity,		sizeof(matDatas[i].specularity),		1, fp);
+		fread(&matDatas[i].specularColor,	sizeof(matDatas[i].specularColor),		1, fp);
+		fread(&matDatas[i].mirrorColor,		sizeof(matDatas[i].mirrorColor),		1, fp);
+		fread(&matDatas[i].toonIndex,		sizeof(matDatas[i].toonIndex),			1, fp);
+		fread(&matDatas[i].edgeFlag,		sizeof(matDatas[i].edgeFlag),			1, fp);
+		fread(&matDatas[i].faceVertCount,	sizeof(matDatas[i].faceVertCount),		1, fp);
+		fread(&matDatas[i].textureFileName,	sizeof(matDatas[i].textureFileName),	1, fp);
 
 		if (std::strlen(matDatas[i].textureFileName) > 0)
 		{
@@ -107,12 +107,12 @@ void PMDManager::Load(const std::string& filepath)
 	bones.resize(boneCount);
 	for (auto& bone : bones)
 	{
-		fread(&bone.boneName, sizeof(bone.boneName), 1, fp);
-		fread(&bone.parentBoneIndex, sizeof(bone.parentBoneIndex), 1, fp);
-		fread(&bone.tailPosBoneIndex, sizeof(bone.tailPosBoneIndex), 1, fp);
-		fread(&bone.boneType, sizeof(bone.boneType), 1, fp);
-		fread(&bone.ikParentBoneIndex, sizeof(bone.ikParentBoneIndex), 1, fp);
-		fread(&bone.boneHeadPos, sizeof(bone.boneHeadPos), 1, fp);
+		fread(&bone.boneName,			sizeof(bone.boneName),			1, fp);
+		fread(&bone.parentBoneIndex,	sizeof(bone.parentBoneIndex),	1, fp);
+		fread(&bone.tailPosBoneIndex,	sizeof(bone.tailPosBoneIndex),	1, fp);
+		fread(&bone.boneType,			sizeof(bone.boneType),			1, fp);
+		fread(&bone.ikParentBoneIndex,	sizeof(bone.ikParentBoneIndex),	1, fp);
+		fread(&bone.boneHeadPos,		sizeof(bone.boneHeadPos),		1, fp);
 	}
 
 	// IK数読み込み
@@ -131,14 +131,20 @@ void PMDManager::Load(const std::string& filepath)
 	// 表情数読み込み
 	unsigned short skinNum = 0;
 	fread(&skinNum, sizeof(skinNum), 1, fp);
-	// 表情読み込み(今は省略)
-	for (int i = 0; i < skinNum; ++i)
+	// 表情読み込み
+	skinDatas.resize(skinNum);
+	for (auto& skin : skinDatas)
 	{
-		fseek(fp, 20, SEEK_CUR);
-		unsigned int vertNum = 0;
-		fread(&vertNum, sizeof(vertNum), 1, fp);
-		fseek(fp, 1, SEEK_CUR);
-		fseek(fp, 16 * vertNum, SEEK_CUR);
+		fread(&skin.skinName,		sizeof(skin.skinName),		1, fp);
+		fread(&skin.skinVertCount,	sizeof(skin.skinVertCount),	1, fp);
+		fread(&skin.skinType,		sizeof(skin.skinType),		1, fp);
+
+		skin.skinVertData.resize(skin.skinVertCount);
+		for (auto& vertdata : skin.skinVertData)
+		{
+			fread(&vertdata.skinVertIndex,	sizeof(vertdata.skinVertIndex),	1, fp);
+			fread(&vertdata.skinVertPos,	sizeof(vertdata.skinVertPos),	1, fp);
+		}
 	}
 
 	// 表示用表情(今は省略)
@@ -643,7 +649,7 @@ void PMDManager::RotateBone(const char* bonename, const DirectX::XMFLOAT4& q, co
 		DirectX::XMMatrixTranslationFromVector(vec);
 }
 
-void PMDManager::MotionUpdate(const std::map<std::string, std::vector<KeyFlames>>& animationdata, int frame)
+void PMDManager::MotionUpdate(const std::map<std::string, std::vector<BoneKeyFrames>>& animationdata, const int& frame)
 {
 	// 最初に初期化
 	std::fill(boneMatrices.begin(), boneMatrices.end(), DirectX::XMMatrixIdentity());
@@ -655,7 +661,7 @@ void PMDManager::MotionUpdate(const std::map<std::string, std::vector<KeyFlames>
 
 		// ラムダ式(理解して)
 		auto frameIt = std::find_if(keyframe.rbegin(), keyframe.rend(),
-			[frame](const KeyFlames& k) {return k.frameNo <= frame; });	// 現在のフレームに近い前のフレーム
+			[frame](const BoneKeyFrames& k) {return k.frameNo <= frame; });	// 現在のフレームに近い前のフレーム
 
 		if (frameIt == keyframe.rend())
 		{
@@ -689,9 +695,16 @@ void PMDManager::MotionUpdate(const std::map<std::string, std::vector<KeyFlames>
 	std::copy(boneMatrices.begin(), boneMatrices.end(), matMap);
 }
 
-void PMDManager::Update(const std::map<std::string, std::vector<KeyFlames>>& animationdata, int nowflame)
+void PMDManager::SkinUpdate(const std::map<std::string, std::vector<SkinKeyFrames>>& skindata, const int& frame)
 {
-	MotionUpdate(animationdata, nowflame);
+
+}
+
+void PMDManager::Update(const std::map<std::string, std::vector<BoneKeyFrames>>& animationdata, 
+					const std::map<std::string, std::vector<SkinKeyFrames>>& skindata, const int& nowframe)
+{
+	MotionUpdate(animationdata, nowframe);
+	SkinUpdate(skindata, nowframe);
 }
 
 void PMDManager::Draw(ID3D12GraphicsCommandList* cmdList)

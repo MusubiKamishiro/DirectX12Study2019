@@ -101,7 +101,8 @@ private:
 	std::shared_ptr<VMDLoader> vmdLoader;
 	std::string vmdPath;	// vmd‚ÌƒpƒX
 
-	int frame = 0;
+	unsigned int startTime = timeGetTime();
+	unsigned int frame = 0;
 	
 public:
 	Dx12Wrapper(HWND hwnd);

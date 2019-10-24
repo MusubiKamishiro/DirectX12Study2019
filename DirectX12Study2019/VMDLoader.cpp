@@ -5,6 +5,7 @@ VMDLoader::VMDLoader(const std::string& filepath)
 {
 	Load(filepath);
 	InitAnimationData();
+	InitSkinData();
 	SearchMaxFrame();
 }
 
@@ -22,14 +23,14 @@ void VMDLoader::Load(const std::string& filepath)
 	fseek(fp, 50, SEEK_SET);
 
 	// モーションデータ数
-	unsigned int motionCount;
+	unsigned int motionCount = 0;
 	fread(&motionCount, sizeof(motionCount), 1, fp);
 
 	// モーションデータ
-	motiondata.resize(motionCount);
+	motiondatas.resize(motionCount);
 
 	// モーションデータ読み込み
-	for (auto& keyframe : motiondata)
+	for (auto& keyframe : motiondatas)
 	{
 		fread(&keyframe.boneName,		sizeof(keyframe.boneName),		1, fp);
 		fread(&keyframe.frameNo,		sizeof(keyframe.frameNo),		1, fp);
@@ -37,15 +38,28 @@ void VMDLoader::Load(const std::string& filepath)
 		fread(&keyframe.rotation,		sizeof(keyframe.rotation),		1, fp);
 		fread(&keyframe.interpolation,	sizeof(keyframe.interpolation),	1, fp);
 	}
+
+	// 表情データ数読み込み
+	unsigned int skinCount = 0;
+	fread(&skinCount, sizeof(skinCount), 1, fp);
+
+	// 表情データ読み込み
+	skindatas.resize(skinCount);
+	for (auto& skindata : skindatas)
+	{
+		fread(&skindata.skinName,	sizeof(skindata.skinName),	1, fp);
+		fread(&skindata.frameNo,	sizeof(skindata.frameNo),	1, fp);
+		fread(&skindata.weight,		sizeof(skindata.weight),	1, fp);
+	}
 }
 
 void VMDLoader::InitAnimationData()
 {
-	std::map<std::string, std::vector<KeyFlames>> notSortAnimData;
+	std::map<std::string, std::vector<BoneKeyFrames>> notSortAnimData;
 	// 対象の骨に追加
-	for (auto& f : motiondata)
+	for (auto& f : motiondatas)
 	{
-		notSortAnimData[f.boneName].emplace_back(KeyFlames(f.frameNo, f.rotation));
+		notSortAnimData[f.boneName].emplace_back(BoneKeyFrames(f.frameNo, f.rotation));
 	}
 
 	// ソート
@@ -56,7 +70,7 @@ void VMDLoader::InitAnimationData()
 
 		if (frameNo.size() == 1)
 		{
-			animationData[bonename].emplace_back(KeyFlames(frameNo[0].frameNo, frameNo[0].quaternion));
+			animationData[bonename].emplace_back(BoneKeyFrames(frameNo[0].frameNo, frameNo[0].quaternion));
 			continue;	// アニメーションがないならソートする必要なし
 		}
 
@@ -76,7 +90,48 @@ void VMDLoader::InitAnimationData()
 		for (int i = 0; i < frameNo.size(); i++)
 		{
 			// ソートしたものを追加
-			animationData[bonename].emplace_back(KeyFlames(frameNo[i].frameNo, frameNo[i].quaternion));
+			animationData[bonename].emplace_back(BoneKeyFrames(frameNo[i].frameNo, frameNo[i].quaternion));
+		}
+	}
+}
+
+void VMDLoader::InitSkinData()
+{
+	std::map<std::string, std::vector<SkinKeyFrames>> notSortSkinData;
+	for (auto& f : skindatas)
+	{
+		skinData[f.skinName].emplace_back(SkinKeyFrames(f.frameNo, f.weight));
+	}
+
+	// ソート
+	for (auto& skin : notSortSkinData)
+	{
+		auto skinname = skin.first;
+		auto frameNo = skin.second;
+
+		if (frameNo.size() == 1)
+		{
+			skinData[skinname].emplace_back(SkinKeyFrames(frameNo[0].frameNo, frameNo[0].weight));
+			continue;
+		}
+
+		for (int i = 0; i < frameNo.size() - 1; i++)
+		{
+			for (int j = i; j < frameNo.size(); j++)
+			{
+				if (frameNo[i].frameNo > frameNo[j].frameNo)
+				{
+					auto f = frameNo[i];
+
+					frameNo[i] = frameNo[j];
+					frameNo[j] = f;
+				}
+			}
+		}
+		for (int i = 0; i < frameNo.size(); i++)
+		{
+			// ソートしたものを追加
+			skinData[skinname].emplace_back(SkinKeyFrames(frameNo[i].frameNo, frameNo[i].weight));
 		}
 	}
 }
@@ -94,9 +149,14 @@ void VMDLoader::SearchMaxFrame()
 	}
 }
 
-const std::map<std::string, std::vector<KeyFlames>>& VMDLoader::GetAnimationData() const
+const std::map<std::string, std::vector<BoneKeyFrames>>& VMDLoader::GetAnimationData() const
 {
 	return animationData;
+}
+
+const std::map<std::string, std::vector<SkinKeyFrames>>& VMDLoader::GetSkinData() const
+{
+	return skinData;
 }
 
 const int VMDLoader::GetMaxFrame() const

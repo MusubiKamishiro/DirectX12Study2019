@@ -16,27 +16,49 @@ struct VMDMotionData
 	unsigned char interpolation[64];	// [4][4][4]	// 補完
 };
 
-// フレームの位置と回転情報
-struct KeyFlames
+// 表情データ
+struct VMDSkinData
 {
-	KeyFlames() : frameNo(0), quaternion(0, 0, 0, 0) {};
-	KeyFlames(int f, DirectX::XMFLOAT4 q) : frameNo(f), quaternion(q) {};
+	char skinName[15];		// 表情名
+	unsigned int frameNo;	// フレーム番号
+	float weight;			// 表情の設定値(表情スライダーの値)
+};
+
+
+// フレームの位置と回転情報
+struct BoneKeyFrames
+{
+	BoneKeyFrames() : frameNo(0), quaternion(0, 0, 0, 0) {};
+	BoneKeyFrames(int f, DirectX::XMFLOAT4 q) : frameNo(f), quaternion(q) {};
 	int frameNo;					// フレーム番号
 	DirectX::XMFLOAT4 quaternion;	// 回転情報
 };
 
+// フレームの位置と表情スライダーの値
+struct SkinKeyFrames
+{
+	SkinKeyFrames() : frameNo(0), weight(0.0f) {};
+	SkinKeyFrames(int f, float w) : frameNo(f), weight(w) {};
+	int frameNo;
+	float weight;
+};
 
 class VMDLoader
 {
 private:
 	// vmdファイルの読み込み
 	void Load(const std::string& filepath);
-	std::vector<VMDMotionData> motiondata;
+	std::vector<VMDMotionData> motiondatas;
+	std::vector<VMDSkinData> skindatas;
 
 	// アニメーションデータの初期化
 	void InitAnimationData();
 	// <ボーン名, フレーム位置と回転情報>
-	std::map<std::string, std::vector<KeyFlames>> animationData;
+	std::map<std::string, std::vector<BoneKeyFrames>> animationData;
+
+	// 表情データの初期化
+	void InitSkinData();
+	std::map<std::string, std::vector<SkinKeyFrames>> skinData;
 
 	// モーションの時間を求める
 	void SearchMaxFrame();
@@ -46,7 +68,8 @@ public:
 	VMDLoader(const std::string& filepath);
 	~VMDLoader();
 
-	const std::map<std::string, std::vector<KeyFlames>>& GetAnimationData()const;
+	const std::map<std::string, std::vector<BoneKeyFrames>>& GetAnimationData()const;
+	const std::map<std::string, std::vector<SkinKeyFrames>>& GetSkinData()const;
 	const int GetMaxFrame()const;
 };
 

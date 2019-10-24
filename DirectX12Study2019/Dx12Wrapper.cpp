@@ -13,6 +13,7 @@
 #pragma comment(lib,"dxgi.lib")
 #pragma comment(lib, "d3dcompiler.lib")
 #pragma comment(lib, "DirectXTex.lib")
+#pragma comment(lib, "winmm.lib")
 
 
 void Dx12Wrapper::CreateDebugLayer()
@@ -396,8 +397,8 @@ Dx12Wrapper::Dx12Wrapper(HWND hwnd)
 
 	//vmdPath = "motion/pose.vmd";
 	//vmdPath = "motion/charge.vmd";
-	//vmdPath = "motion/Miku.vmd";
-	vmdPath = "motion/ヤゴコロダンス.vmd";
+	vmdPath = "motion/Miku.vmd";
+	//vmdPath = "motion/ヤゴコロダンス.vmd";
 	vmdLoader.reset(new VMDLoader(vmdPath));
 
 	CreateDepthBuff();
@@ -495,9 +496,10 @@ void Dx12Wrapper::Update()
 	m->world *= DirectX::XMMatrixRotationX(angle.y);
 
 
-	pmdManager->Update(vmdLoader->GetAnimationData(), frame);
+	// 固定フレームにする
+	frame = (timeGetTime() - startTime) / 30;
 
-	++frame;
+	pmdManager->Update(vmdLoader->GetAnimationData(), vmdLoader->GetSkinData(), frame);
 }
 
 void Dx12Wrapper::Draw()

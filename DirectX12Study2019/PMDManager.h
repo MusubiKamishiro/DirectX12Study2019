@@ -12,8 +12,8 @@
 class ImageManager;
 
 
-// PMDのヘッダファイル
-struct PMD
+// ヘッダファイル
+struct PMDHeader
 {
 	char magic[3];		// "Pmd"
 	float version;		// バージョン
@@ -21,7 +21,7 @@ struct PMD
 	char comment[256];	// 製作者コメント
 };
 
-// PMDの頂点データ
+// 頂点データ
 struct PMDVertexData
 {
 	DirectX::XMFLOAT3 pos;		// x, y, z					// 座標
@@ -32,7 +32,7 @@ struct PMDVertexData
 	unsigned char edgeFlag;		// 0:通常、1:エッジ無効		// エッジ(輪郭)が有効の場合
 };
 
-// PMDのマテリアルデータ
+// マテリアルデータ
 struct PMDMaterialData
 {
 	DirectX::XMFLOAT3 diffuseColor;	// dr, dg, db	// 減衰色
@@ -47,7 +47,23 @@ struct PMDMaterialData
 	char textureFileName[20];		// テクスチャファイル名
 };
 
-// PMDの骨のデータ
+// 表情用の頂点データ
+struct PMDSkinVertData
+{
+	unsigned int skinVertIndex;	// 表情用の頂点の番号(頂点リストにある番号)
+	float skinVertPos[3];		// x, y, z // 表情用の頂点の座標(頂点自体の座標)
+};
+
+// 表情のデータ
+struct PMDSkinData
+{
+	char skinName[20];			// 表情名
+	unsigned int skinVertCount;	// 表情用の頂点数
+	char skinType;				// 表情の種類 // 0：base、1：まゆ、2：目、3：リップ、4：その他
+	std::vector<PMDSkinVertData> skinVertData;	// 表情用の頂点のデータ(16Bytes/vert)
+};
+
+// 骨のデータ
 struct PMDBoneData
 {
 	char boneName[20];					// ボーン名
@@ -60,7 +76,7 @@ struct PMDBoneData
 
 struct BoneNode
 {
-	int boneIdx;						// ボーン行列配列と対応
+	int boneIdx = 0;					// ボーン行列配列と対応
 	DirectX::XMFLOAT3 startPos;			// ボーン始点(関節初期座標)
 	DirectX::XMFLOAT3 endPos;			// ボーン終点(次の関節座標)
 	std::vector<BoneNode*> children;	// 子供たちへのリンク
@@ -76,6 +92,7 @@ private:
 	std::vector<char> vertexDatas;				// 頂点データ
 	std::vector<unsigned short> faceVertices;	// 面頂点データ
 	std::vector<PMDMaterialData> matDatas;		// マテリアルデータ
+	std::vector<PMDSkinData> skinDatas;			// 表情データ
 	std::vector<PMDBoneData> bones;				// 骨
 	std::array<char[100], 10> toonTexNames;		// トゥーンテクスチャの名前, 固定
 	std::vector<std::string> modelTexturesPath;	// モデルに張り付けるテクスチャのパス(中身がないときもある)
@@ -154,14 +171,15 @@ private:
 	void RotateBone(const char* bonename, const DirectX::XMFLOAT4& quaternion);
 	void RotateBone(const char* bonename, const DirectX::XMFLOAT4& q, const DirectX::XMFLOAT4& q2, float t = 0.0f);
 
-	void MotionUpdate(const std::map<std::string, std::vector<KeyFlames>>& animationdata, int frame);
+	void MotionUpdate(const std::map<std::string, std::vector<BoneKeyFrames>>& animationdata, const int& frame);
+	void SkinUpdate(const std::map<std::string, std::vector<SkinKeyFrames>>& skindata, const int& frame);
 
 
 public:
 	PMDManager(const std::string& filepath);
 	~PMDManager();
 
-	void Update(const std::map<std::string, std::vector<KeyFlames>>& animationdata, int nowflame);
+	void Update(const std::map<std::string, std::vector<BoneKeyFrames>>& animationdata, const std::map<std::string, std::vector<SkinKeyFrames>>& skindata, const int& nowframe);
 	void Draw(ID3D12GraphicsCommandList* cmdList);
 };
 
