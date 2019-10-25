@@ -25,6 +25,7 @@ PMDManager::PMDManager(const std::string& filepath)
 	InitMaterials();
 
 	CreateBone();
+	CreateSkin();
 }
 
 PMDManager::~PMDManager()
@@ -474,10 +475,10 @@ void PMDManager::CreateBone()
 	for (int idx = 0; idx < bones.size(); idx++)
 	{
 		auto& b = bones[idx];
-		auto& BNode = boneMap[b.boneName];
-		BNode.boneIdx = idx;
-		BNode.startPos = b.boneHeadPos;
-		BNode.endPos = bones[b.tailPosBoneIndex].boneHeadPos;
+		auto& bNode = boneMap[b.boneName];
+		bNode.boneIdx = idx;
+		bNode.startPos = b.boneHeadPos;
+		bNode.endPos = bones[b.tailPosBoneIndex].boneHeadPos;
 	}
 	for (auto& b : boneMap)
 	{
@@ -522,6 +523,32 @@ void PMDManager::CreateBone()
 	result = boneBuff->Map(0, nullptr, (void**)& matMap);
 	std::copy(boneMatrices.begin(), boneMatrices.end(), matMap);
 
+}
+
+void PMDManager::CreateSkin()
+{
+	// baseの表情
+	auto& skin = skinDatas[0];
+	auto& skinBase = skinMap[skin.skinName];
+	skinBase.resize(skin.skinVertCount);
+	for (int i = 0; i < skinBase.size(); ++i)
+	{
+		skinBase[i].skinVertIndex = skin.skinVertData[i].skinVertIndex;
+		skinBase[i].skinVertPos = skin.skinVertData[i].skinVertPos;
+	}
+
+	// base以外の情報
+	for (int idx = 1; idx < skinDatas.size(); idx++)
+	{
+		skin = skinDatas[idx];
+		auto& sNode = skinMap[skin.skinName]; 
+		sNode.resize(skin.skinVertCount);
+		for (int i = 0; i < sNode.size(); ++i)
+		{
+			sNode[i].skinVertIndex = skinBase[skin.skinVertData[i].skinVertIndex].skinVertIndex;
+			sNode[i].skinVertPos = skin.skinVertData[i].skinVertPos;
+		}
+	}
 }
 
 std::string PMDManager::GetModelTexturePath(const std::string& modelpath, const char* texpath)
@@ -627,7 +654,7 @@ void PMDManager::RecursiveMatrixMultply(BoneNode& node, DirectX::XMMATRIX& inMat
 	}
 }
 
-void PMDManager::RotateBone(const char* bonename, const DirectX::XMFLOAT4& quaternion)
+void PMDManager::RotateBone(const std::string& bonename, const DirectX::XMFLOAT4& quaternion)
 {
 	auto& bonenode = boneMap[bonename];
 	auto vec = DirectX::XMLoadFloat3(&bonenode.startPos);	// XMLoadFloat3...XMFLOAT3をXMVECTORに変換する
@@ -637,7 +664,7 @@ void PMDManager::RotateBone(const char* bonename, const DirectX::XMFLOAT4& quate
 										* DirectX::XMMatrixRotationQuaternion(q) * DirectX::XMMatrixTranslationFromVector(vec);
 }
 
-void PMDManager::RotateBone(const char* bonename, const DirectX::XMFLOAT4& q, const DirectX::XMFLOAT4& q2, float t)
+void PMDManager::RotateBone(const std::string& bonename, const DirectX::XMFLOAT4& q, const DirectX::XMFLOAT4& q2, float t)
 {
 	auto& bonenode = boneMap[bonename];
 	auto vec = DirectX::XMLoadFloat3(&bonenode.startPos);
@@ -659,7 +686,7 @@ void PMDManager::MotionUpdate(const std::map<std::string, std::vector<BoneKeyFra
 	{
 		auto& keyframe = boneAnim.second;
 
-		// ラムダ式(理解して)
+		// ラムダ式
 		auto frameIt = std::find_if(keyframe.rbegin(), keyframe.rend(),
 			[frame](const BoneKeyFrames& k) {return k.frameNo <= frame; });	// 現在のフレームに近い前のフレーム
 
@@ -695,9 +722,42 @@ void PMDManager::MotionUpdate(const std::map<std::string, std::vector<BoneKeyFra
 	std::copy(boneMatrices.begin(), boneMatrices.end(), matMap);
 }
 
-void PMDManager::SkinUpdate(const std::map<std::string, std::vector<SkinKeyFrames>>& skindata, const int& frame)
+void PMDManager::ChangeSkin(const std::string& skinname)
 {
 
+
+	//auto& bonenode = boneMap[bonename];
+	//auto vec = DirectX::XMLoadFloat3(&bonenode.startPos);	// XMLoadFloat3...XMFLOAT3をXMVECTORに変換する
+	//auto q = DirectX::XMLoadFloat4(&quaternion);
+
+	//boneMatrices[bonenode.boneIdx] = DirectX::XMMatrixTranslationFromVector(DirectX::XMVectorScale(vec, -1))
+	//	* DirectX::XMMatrixRotationQuaternion(q) * DirectX::XMMatrixTranslationFromVector(vec);
+}
+
+void PMDManager::SkinUpdate(const std::map<std::string, std::vector<SkinKeyFrames>>& skindata, const int& frame)
+{
+	auto data = skinMap["笑い"];
+	for (auto& d : data)
+	{
+		
+	}
+
+	//for (auto& skinAnim : skindata)
+	//{
+	//	auto& keyframe = skinAnim.second;
+
+	//	// ラムダ式
+	//	auto frameIt = std::find_if(keyframe.rbegin(), keyframe.rend(),
+	//		[frame](const SkinKeyFrames& k) {return k.frameNo <= frame; });	// 現在のフレームに近い前のフレーム
+
+	//	if (frameIt == keyframe.rend())
+	//	{
+	//		// 対象のものがなかったらendが返ってくる
+	//		// 対象のものがなければやり直し
+	//		continue;
+	//	}
+	//	auto nextFrameIt = frameIt.base();				// 現在のフレームに近い次のフレーム
+	//}
 }
 
 void PMDManager::Update(const std::map<std::string, std::vector<BoneKeyFrames>>& animationdata, 

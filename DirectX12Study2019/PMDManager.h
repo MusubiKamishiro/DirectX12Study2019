@@ -50,8 +50,8 @@ struct PMDMaterialData
 // 表情用の頂点データ
 struct PMDSkinVertData
 {
-	unsigned int skinVertIndex;	// 表情用の頂点の番号(頂点リストにある番号)
-	float skinVertPos[3];		// x, y, z // 表情用の頂点の座標(頂点自体の座標)
+	unsigned int skinVertIndex = 0;	// 表情用の頂点の番号(頂点リストにある番号)
+	DirectX::XMFLOAT3 skinVertPos;	// x, y, z // 表情用の頂点の座標(頂点自体の座標)
 };
 
 // 表情のデータ
@@ -135,6 +135,10 @@ private:
 	std::vector<DirectX::XMMATRIX> boneMatrices;	// ボーン行列転送用
 	std::map<std::string, BoneNode> boneMap;		// ボーンマップ
 
+	// 表情作成
+	void CreateSkin();
+	std::map<std::string, std::vector<PMDSkinVertData>> skinMap;
+
 	std::shared_ptr<ImageManager> imageManager;
 
 	// モデルのテクスチャのパスを獲得
@@ -168,10 +172,12 @@ private:
 
 	// 骨を回転させる
 	//@param quaternion
-	void RotateBone(const char* bonename, const DirectX::XMFLOAT4& quaternion);
-	void RotateBone(const char* bonename, const DirectX::XMFLOAT4& q, const DirectX::XMFLOAT4& q2, float t = 0.0f);
+	void RotateBone(const std::string& bonename, const DirectX::XMFLOAT4& quaternion);
+	void RotateBone(const std::string& bonename, const DirectX::XMFLOAT4& q, const DirectX::XMFLOAT4& q2, float t = 0.0f);
 
 	void MotionUpdate(const std::map<std::string, std::vector<BoneKeyFrames>>& animationdata, const int& frame);
+
+	void ChangeSkin(const std::string& skinname);
 	void SkinUpdate(const std::map<std::string, std::vector<SkinKeyFrames>>& skindata, const int& frame);
 
 
