@@ -30,6 +30,7 @@ struct PMDVertexData
 	unsigned short boneNum[2];	// ボーン番号1、番号2		// モデル変形(頂点移動)時に影響
 	unsigned char boneWeight;	// ボーン1に与える影響度	// min:0 max:100	// ボーン2への影響度は、(100 - bone_weight)
 	unsigned char edgeFlag;		// 0:通常、1:エッジ無効		// エッジ(輪郭)が有効の場合
+	unsigned char kuuhaku[2];	// パティング用
 };
 
 // マテリアルデータ
@@ -89,7 +90,7 @@ class PMDManager
 private:
 	// PMDデータの読み込み
 	void Load(const std::string& filepath);
-	std::vector<char> vertexDatas;				// 頂点データ
+	std::vector<PMDVertexData> vertexDatas;		// 頂点データ
 	std::vector<unsigned short> faceVertices;	// 面頂点データ
 	std::vector<PMDMaterialData> matDatas;		// マテリアルデータ
 	std::vector<PMDSkinData> skinDatas;			// 表情データ
@@ -180,7 +181,7 @@ private:
 	void ChangeSkin(const std::string& skinname);
 	void SkinUpdate(const std::map<std::string, std::vector<SkinKeyFrames>>& skindata, const int& frame);
 
-
+	bool flag = true;
 public:
 	PMDManager(const std::string& filepath);
 	~PMDManager();

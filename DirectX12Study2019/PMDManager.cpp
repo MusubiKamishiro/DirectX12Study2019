@@ -67,8 +67,18 @@ void PMDManager::Load(const std::string& filepath)
 	unsigned int vertexCount;
 	fread(&vertexCount, sizeof(vertexCount), 1, fp);
 	// 頂点の数だけ頂点リスト読み込み
-	vertexDatas.resize(vertexCount * (sizeof(PMDVertexData) - 2));
-	fread(vertexDatas.data(), vertexDatas.size(), 1, fp);
+	vertexDatas.resize(vertexCount);
+	for (int i = 0; i < vertexDatas.size(); ++i)
+	{
+		fread(&vertexDatas[i].pos,			sizeof(vertexDatas[i].pos), 1, fp);
+		fread(&vertexDatas[i].normalVec,	sizeof(vertexDatas[i].normalVec), 1, fp);
+		fread(&vertexDatas[i].uv,			sizeof(vertexDatas[i].uv), 1, fp);
+		fread(&vertexDatas[i].boneNum,		sizeof(vertexDatas[i].boneNum), 1, fp);
+		fread(&vertexDatas[i].boneWeight,	sizeof(vertexDatas[i].boneWeight), 1, fp);
+		fread(&vertexDatas[i].edgeFlag,		sizeof(vertexDatas[i].edgeFlag), 1, fp);
+		//vertexDatas[i].kuuhaku[0] = 0;
+		//vertexDatas[i].kuuhaku[1] = 0;
+	}
 
 	// 面頂点数読み込み
 	unsigned int faceVertexCount;
@@ -194,7 +204,7 @@ void PMDManager::CreateView()
 
 	D3D12_RESOURCE_DESC resdesc = {};
 	resdesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-	resdesc.Width = vertexDatas.size();	// 頂点情報が入るだけのサイズ
+	resdesc.Width = vertexDatas.size() * (sizeof(PMDVertexData));	// 頂点情報が入るだけのサイズ
 	resdesc.Height = 1;
 	resdesc.DepthOrArraySize = 1;
 	resdesc.MipLevels = 1;
@@ -214,14 +224,14 @@ void PMDManager::CreateView()
 		D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&indexBuffer));
 
 	D3D12_RANGE range = { 0,0 };
-	char* vertexMap = nullptr;
+	PMDVertexData* vertexMap = nullptr;
 	result = vertexBuffer->Map(0, &range, (void**)& vertexMap);
 	std::copy(vertexDatas.begin(), vertexDatas.end(), vertexMap);
 	vertexBuffer->Unmap(0, nullptr);
 	
 	vbView.BufferLocation = vertexBuffer->GetGPUVirtualAddress();
-	vbView.StrideInBytes = 38;	// 頂点1つあたりのバイト数
-	vbView.SizeInBytes = vertexDatas.size();	// データ全体のサイズ
+	vbView.StrideInBytes = sizeof(PMDVertexData);	// 頂点1つあたりのバイト数
+	vbView.SizeInBytes = vertexDatas.size() * sizeof(PMDVertexData);		// データ全体のサイズ
 
 	unsigned short* ibuffptr = nullptr;
 	result = indexBuffer->Map(0, &range, (void**)& ibuffptr);
@@ -538,6 +548,7 @@ void PMDManager::CreateSkin()
 	}
 
 	// base以外の情報
+	// この時点で頂点インデックスを全体のものに合わせる
 	for (int idx = 1; idx < skinDatas.size(); idx++)
 	{
 		skin = skinDatas[idx];
@@ -725,21 +736,41 @@ void PMDManager::MotionUpdate(const std::map<std::string, std::vector<BoneKeyFra
 void PMDManager::ChangeSkin(const std::string& skinname)
 {
 
-
-	//auto& bonenode = boneMap[bonename];
-	//auto vec = DirectX::XMLoadFloat3(&bonenode.startPos);	// XMLoadFloat3...XMFLOAT3をXMVECTORに変換する
-	//auto q = DirectX::XMLoadFloat4(&quaternion);
-
-	//boneMatrices[bonenode.boneIdx] = DirectX::XMMatrixTranslationFromVector(DirectX::XMVectorScale(vec, -1))
-	//	* DirectX::XMMatrixRotationQuaternion(q) * DirectX::XMMatrixTranslationFromVector(vec);
 }
 
 void PMDManager::SkinUpdate(const std::map<std::string, std::vector<SkinKeyFrames>>& skindata, const int& frame)
 {
-	auto data = skinMap["笑い"];
-	for (auto& d : data)
+	if (flag)
 	{
-		
+		static int count = 0;
+		auto data = skinMap["笑い"];
+		for (auto& d : data)
+		{
+			vertexDatas[d.skinVertIndex].pos.x += d.skinVertPos.x / 100;
+			vertexDatas[d.skinVertIndex].pos.y += d.skinVertPos.y / 100;
+			vertexDatas[d.skinVertIndex].pos.z += d.skinVertPos.z / 100;
+		}
+		data = skinMap["にやり"];
+		for (auto& d : data)
+		{
+			vertexDatas[d.skinVertIndex].pos.x += d.skinVertPos.x / 100;
+			vertexDatas[d.skinVertIndex].pos.y += d.skinVertPos.y / 100;
+			vertexDatas[d.skinVertIndex].pos.z += d.skinVertPos.z / 100;
+		}
+		D3D12_RANGE range = { 0,0 };
+		PMDVertexData* vertexMap = nullptr;
+		auto result = vertexBuffer->Map(0, &range, (void**)& vertexMap);
+		std::copy(vertexDatas.begin(), vertexDatas.end(), vertexMap);
+		vertexBuffer->Unmap(0, nullptr);
+
+		if (count == 100)
+		{
+			flag = false;
+		}
+		else
+		{
+			++count;
+		}
 	}
 
 	//for (auto& skinAnim : skindata)

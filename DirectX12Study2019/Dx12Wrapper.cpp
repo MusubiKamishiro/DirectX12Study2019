@@ -397,8 +397,8 @@ Dx12Wrapper::Dx12Wrapper(HWND hwnd)
 
 	//vmdPath = "motion/pose.vmd";
 	//vmdPath = "motion/charge.vmd";
-	vmdPath = "motion/Miku.vmd";
-	//vmdPath = "motion/ヤゴコロダンス.vmd";
+	//vmdPath = "motion/Miku.vmd";
+	vmdPath = "motion/ヤゴコロダンス.vmd";
 	vmdLoader.reset(new VMDLoader(vmdPath));
 
 	CreateDepthBuff();
