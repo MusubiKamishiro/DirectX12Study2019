@@ -100,7 +100,7 @@ void VMDLoader::InitSkinData()
 	std::map<std::string, std::vector<SkinKeyFrames>> notSortSkinData;
 	for (auto& f : skindatas)
 	{
-		skinData[f.skinName].emplace_back(SkinKeyFrames(f.frameNo, f.weight));
+		notSortSkinData[f.skinName].emplace_back(SkinKeyFrames(f.frameNo, f.weight));
 	}
 
 	// É\Å[Ég

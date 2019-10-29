@@ -1,6 +1,7 @@
 #include "PMDManager.h"
 #include "d3dx12.h"
 #include "shlwapi.h"
+#include <algorithm>
 
 #include "Dx12Device.h"
 #include "Dx12Constants.h"
@@ -231,7 +232,7 @@ void PMDManager::CreateView()
 	
 	vbView.BufferLocation = vertexBuffer->GetGPUVirtualAddress();
 	vbView.StrideInBytes = sizeof(PMDVertexData);	// 頂点1つあたりのバイト数
-	vbView.SizeInBytes = vertexDatas.size() * sizeof(PMDVertexData);		// データ全体のサイズ
+	vbView.SizeInBytes = vertexDatas.size() * sizeof(PMDVertexData);	// データ全体のサイズ
 
 	unsigned short* ibuffptr = nullptr;
 	result = indexBuffer->Map(0, &range, (void**)& ibuffptr);
@@ -275,7 +276,6 @@ void PMDManager::CreateModelTexture()
 		}
 
 		auto ext = GetExtension(texFileName.c_str());
-		auto path = GetWideStringFromString(texFileName);
 
 		// 画像読み込み&書き込み
 		if (ext == "png" || ext == "bmp" || ext == "jpg" || ext == "tga")
@@ -675,12 +675,12 @@ void PMDManager::RotateBone(const std::string& bonename, const DirectX::XMFLOAT4
 										* DirectX::XMMatrixRotationQuaternion(q) * DirectX::XMMatrixTranslationFromVector(vec);
 }
 
-void PMDManager::RotateBone(const std::string& bonename, const DirectX::XMFLOAT4& q, const DirectX::XMFLOAT4& q2, float t)
+void PMDManager::RotateBone(const std::string& bonename, const DirectX::XMFLOAT4& q, const DirectX::XMFLOAT4& nextq, float t)
 {
 	auto& bonenode = boneMap[bonename];
 	auto vec = DirectX::XMLoadFloat3(&bonenode.startPos);
 	auto quaternion = XMLoadFloat4(&q);
-	auto quaternion2 = XMLoadFloat4(&q2);
+	auto quaternion2 = XMLoadFloat4(&nextq);
 
 	boneMatrices[bonenode.boneIdx] = DirectX::XMMatrixTranslationFromVector(DirectX::XMVectorScale(vec, -1)) *
 		DirectX::XMMatrixRotationQuaternion(DirectX::XMQuaternionSlerp(quaternion, quaternion2, t)) *
@@ -709,6 +709,7 @@ void PMDManager::MotionUpdate(const std::map<std::string, std::vector<BoneKeyFra
 		}
 		auto nextFrameIt = frameIt.base();				// 現在のフレームに近い次のフレーム
 
+		// 現在のフレームと次のフレームが同じならそのまま回す
 		if (nextFrameIt == keyframe.end())
 		{
 			// 骨回す
@@ -716,6 +717,7 @@ void PMDManager::MotionUpdate(const std::map<std::string, std::vector<BoneKeyFra
 		}
 		else
 		{
+			// 違う場合はポーズの差を補完した状態にする
 			float a = (float)frameIt->frameNo;
 			float b = (float)nextFrameIt->frameNo;
 			float t = (static_cast<float>(frame - a)) / (b - a);	// 補間
@@ -733,62 +735,95 @@ void PMDManager::MotionUpdate(const std::map<std::string, std::vector<BoneKeyFra
 	std::copy(boneMatrices.begin(), boneMatrices.end(), matMap);
 }
 
-void PMDManager::ChangeSkin(const std::string& skinname)
+void PMDManager::ChangeSkin(const std::string& skinname, const float& weight)
 {
+	if (weight != 0.000000f)
+	{
+		auto data = skinMap[skinname];
+		for (auto& d : data)
+		{
+			vertexDatas[d.skinVertIndex].pos.x += d.skinVertPos.x / weight;
+			vertexDatas[d.skinVertIndex].pos.y += d.skinVertPos.y / weight;
+			vertexDatas[d.skinVertIndex].pos.z += d.skinVertPos.z / weight;
+		}
+	}
+}
 
+void PMDManager::ChangeSkin(const std::string& skinname, const float& weight, const float& nextweight, float t)
+{
+	float w = 0.0f;
+	if (weight == nextweight)
+	{
+		w = weight;
+	}
+	else
+	{
+		float min = (std::min)(weight, nextweight);
+		float max = (std::max)(weight, nextweight);
+		w = max - min;
+		w *= t;
+		w += weight;
+	}
+	
+
+	if (w != 0.000000f)
+	{
+		auto data = skinMap[skinname];
+		for (auto& d : data)
+		{
+			vertexDatas[d.skinVertIndex].pos.x += d.skinVertPos.x / w;
+			vertexDatas[d.skinVertIndex].pos.y += d.skinVertPos.y / w;
+			vertexDatas[d.skinVertIndex].pos.z += d.skinVertPos.z / w;
+		}
+	}
 }
 
 void PMDManager::SkinUpdate(const std::map<std::string, std::vector<SkinKeyFrames>>& skindata, const int& frame)
 {
-	if (flag)
+	// 最初にbaseの表情に戻す
+	auto data = skinMap["base"];
+	for (auto& d : data)
 	{
-		static int count = 0;
-		auto data = skinMap["笑い"];
-		for (auto& d : data)
-		{
-			vertexDatas[d.skinVertIndex].pos.x += d.skinVertPos.x / 100;
-			vertexDatas[d.skinVertIndex].pos.y += d.skinVertPos.y / 100;
-			vertexDatas[d.skinVertIndex].pos.z += d.skinVertPos.z / 100;
-		}
-		data = skinMap["にやり"];
-		for (auto& d : data)
-		{
-			vertexDatas[d.skinVertIndex].pos.x += d.skinVertPos.x / 100;
-			vertexDatas[d.skinVertIndex].pos.y += d.skinVertPos.y / 100;
-			vertexDatas[d.skinVertIndex].pos.z += d.skinVertPos.z / 100;
-		}
-		D3D12_RANGE range = { 0,0 };
-		PMDVertexData* vertexMap = nullptr;
-		auto result = vertexBuffer->Map(0, &range, (void**)& vertexMap);
-		std::copy(vertexDatas.begin(), vertexDatas.end(), vertexMap);
-		vertexBuffer->Unmap(0, nullptr);
+		vertexDatas[d.skinVertIndex].pos.x = d.skinVertPos.x;
+		vertexDatas[d.skinVertIndex].pos.y = d.skinVertPos.y;
+		vertexDatas[d.skinVertIndex].pos.z = d.skinVertPos.z;
+	}
 
-		if (count == 100)
+	for (auto& skinAnim : skindata)
+	{
+		auto& keyframe = skinAnim.second;
+
+		// ラムダ式
+		auto frameIt = std::find_if(keyframe.rbegin(), keyframe.rend(),
+			[frame](const SkinKeyFrames& k) {return k.frameNo <= frame; });	// 現在のフレームに近い前のフレーム
+
+		if (frameIt == keyframe.rend())
 		{
-			flag = false;
+			// 対象のものがなかったらendが返ってくる
+			// 対象のものがなければやり直し
+			continue;
+		}
+		auto nextFrameIt = frameIt.base();				// 現在のフレームに近い次のフレーム
+
+		if (nextFrameIt == keyframe.end())
+		{
+			ChangeSkin(skinAnim.first.c_str(), frameIt->weight);
 		}
 		else
 		{
-			++count;
+			float a = (float)frameIt->frameNo;
+			float b = (float)nextFrameIt->frameNo;
+			float t = (static_cast<float>(frame - a)) / (b - a);	// 補間
+
+			ChangeSkin(skinAnim.first.c_str(), frameIt->weight, nextFrameIt->weight, t);
 		}
 	}
 
-	//for (auto& skinAnim : skindata)
-	//{
-	//	auto& keyframe = skinAnim.second;
-
-	//	// ラムダ式
-	//	auto frameIt = std::find_if(keyframe.rbegin(), keyframe.rend(),
-	//		[frame](const SkinKeyFrames& k) {return k.frameNo <= frame; });	// 現在のフレームに近い前のフレーム
-
-	//	if (frameIt == keyframe.rend())
-	//	{
-	//		// 対象のものがなかったらendが返ってくる
-	//		// 対象のものがなければやり直し
-	//		continue;
-	//	}
-	//	auto nextFrameIt = frameIt.base();				// 現在のフレームに近い次のフレーム
-	//}
+	D3D12_RANGE range = { 0,0 };
+	PMDVertexData* vertexMap = nullptr;
+	auto result = vertexBuffer->Map(0, &range, (void**)& vertexMap);
+	std::copy(vertexDatas.begin(), vertexDatas.end(), vertexMap);
+	vertexBuffer->Unmap(0, nullptr);
 }
 
 void PMDManager::Update(const std::map<std::string, std::vector<BoneKeyFrames>>& animationdata, 

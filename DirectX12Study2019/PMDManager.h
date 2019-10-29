@@ -174,14 +174,14 @@ private:
 	// çúÇâÒì]Ç≥ÇπÇÈ
 	//@param quaternion
 	void RotateBone(const std::string& bonename, const DirectX::XMFLOAT4& quaternion);
-	void RotateBone(const std::string& bonename, const DirectX::XMFLOAT4& q, const DirectX::XMFLOAT4& q2, float t = 0.0f);
+	void RotateBone(const std::string& bonename, const DirectX::XMFLOAT4& q, const DirectX::XMFLOAT4& nextq, float t = 0.0f);
 
 	void MotionUpdate(const std::map<std::string, std::vector<BoneKeyFrames>>& animationdata, const int& frame);
 
-	void ChangeSkin(const std::string& skinname);
+	void ChangeSkin(const std::string& skinname, const float& weight);
+	void ChangeSkin(const std::string& skinname, const float& weight, const float& nextweight, float t = 0.0f);
 	void SkinUpdate(const std::map<std::string, std::vector<SkinKeyFrames>>& skindata, const int& frame);
 
-	bool flag = true;
 public:
 	PMDManager(const std::string& filepath);
 	~PMDManager();
