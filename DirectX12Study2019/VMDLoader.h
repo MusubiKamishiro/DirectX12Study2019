@@ -28,9 +28,10 @@ struct VMDSkinData
 // フレームの位置と回転情報
 struct BoneKeyFrames
 {
-	BoneKeyFrames() : frameNo(0), quaternion(0, 0, 0, 0) {};
-	BoneKeyFrames(int f, DirectX::XMFLOAT4 q) : frameNo(f), quaternion(q) {};
+	BoneKeyFrames() : frameNo(0), pos(0, 0, 0), quaternion(0, 0, 0, 0) {};
+	BoneKeyFrames(int f, DirectX::XMFLOAT3 p, DirectX::XMFLOAT4 q) : frameNo(f), pos(p), quaternion(q) {};
 	int frameNo;					// フレーム番号
+	DirectX::XMFLOAT3 pos;			// 座標
 	DirectX::XMFLOAT4 quaternion;	// 回転情報
 };
 

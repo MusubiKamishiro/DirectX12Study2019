@@ -48,6 +48,17 @@ struct PMDMaterialData
 	char textureFileName[20];		// テクスチャファイル名
 };
 
+// IKのデータ
+struct PMDIKData
+{
+	unsigned short ikBoneIndex;			// IKボーン番号
+	unsigned short ikTargetBoneIndex;		// IKターゲットボーン番号	// IKボーンが最初に接続するボーン
+	char ikChainLength;					// IKチェーンの長さ(子の数)
+	unsigned short iterations;			// 再帰演算回数				// IK値1
+	float controlWeight;				// 演算1回あたりの制限角度	// IK値2
+	std::vector<unsigned short> ikChildBoneIndex;		// IK影響下のボーン番号[ikChainLength]
+};
+
 // 表情用の頂点データ
 struct PMDSkinVertData
 {
@@ -93,6 +104,7 @@ private:
 	std::vector<PMDVertexData> vertexDatas;		// 頂点データ
 	std::vector<unsigned short> faceVertices;	// 面頂点データ
 	std::vector<PMDMaterialData> matDatas;		// マテリアルデータ
+	std::vector<PMDIKData> ikDatas;				// IKデータ
 	std::vector<PMDSkinData> skinDatas;			// 表情データ
 	std::vector<PMDBoneData> bones;				// 骨
 	std::array<char[100], 10> toonTexNames;		// トゥーンテクスチャの名前, 固定
@@ -179,7 +191,6 @@ private:
 	void MotionUpdate(const std::map<std::string, std::vector<BoneKeyFrames>>& animationdata, const int& frame);
 
 	void ChangeSkin(const std::string& skinname, const float& weight);
-	void ChangeSkin(const std::string& skinname, const float& weight, const float& nextweight, float t = 0.0f);
 	void SkinUpdate(const std::map<std::string, std::vector<SkinKeyFrames>>& skindata, const int& frame);
 
 public:

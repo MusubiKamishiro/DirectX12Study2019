@@ -77,8 +77,6 @@ void PMDManager::Load(const std::string& filepath)
 		fread(&vertexDatas[i].boneNum,		sizeof(vertexDatas[i].boneNum), 1, fp);
 		fread(&vertexDatas[i].boneWeight,	sizeof(vertexDatas[i].boneWeight), 1, fp);
 		fread(&vertexDatas[i].edgeFlag,		sizeof(vertexDatas[i].edgeFlag), 1, fp);
-		//vertexDatas[i].kuuhaku[0] = 0;
-		//vertexDatas[i].kuuhaku[1] = 0;
 	}
 
 	// –Ê’¸“_”“Ç‚İ‚İ
@@ -130,16 +128,22 @@ void PMDManager::Load(const std::string& filepath)
 	// IK”“Ç‚İ‚İ
 	unsigned short ikNum = 0;
 	fread(&ikNum, sizeof(ikNum), 1, fp);
-	// IK“Ç‚İ‚İ(¡‚ÍÈ—ª)
-	for (int i = 0; i < ikNum; ++i)
+	// IK“Ç‚İ‚İ
+	ikDatas.resize(ikNum);
+	for (auto& ikData : ikDatas)
 	{
-		fseek(fp, 4, SEEK_CUR);
-		unsigned char ikChainNum = 0;
-		fread(&ikChainNum, sizeof(ikChainNum), 1, fp);
-		fseek(fp, 6, SEEK_CUR);
-		fseek(fp, ikChainNum * sizeof(unsigned short), SEEK_CUR);
+		fread(&ikData.ikBoneIndex,			sizeof(ikData.ikBoneIndex),			1, fp);
+		fread(&ikData.ikTargetBoneIndex,	sizeof(ikData.ikTargetBoneIndex),	1, fp);
+		fread(&ikData.ikChainLength,		sizeof(ikData.ikChainLength),		1, fp);
+		fread(&ikData.iterations,			sizeof(ikData.iterations),			1, fp);
+		fread(&ikData.controlWeight,		sizeof(ikData.controlWeight),		1, fp);
+		ikData.ikChildBoneIndex.resize(ikData.ikChainLength);
+		for (auto& child : ikData.ikChildBoneIndex)
+		{
+			fread(&child, sizeof(child), 1, fp);
+		}
 	}
-
+	
 	// •\î”“Ç‚İ‚İ
 	unsigned short skinNum = 0;
 	fread(&skinNum, sizeof(skinNum), 1, fp);
@@ -746,29 +750,6 @@ void PMDManager::ChangeSkin(const std::string& skinname, const float& weight)
 	}
 }
 
-void PMDManager::ChangeSkin(const std::string& skinname, const float& weight, const float& nextweight, float t)
-{
-	float w = 0.0f;
-	if (weight == nextweight)
-	{
-		w = weight;
-	}
-	else
-	{
-		w = nextweight - weight;
-		w *= t;
-		w += weight;
-	}
-	
-	auto data = skinMap[skinname];
-	for (auto& d : data)
-	{
-		vertexDatas[d.skinVertIndex].pos.x += d.skinVertPos.x * w;
-		vertexDatas[d.skinVertIndex].pos.y += d.skinVertPos.y * w;
-		vertexDatas[d.skinVertIndex].pos.z += d.skinVertPos.z * w;
-	}
-}
-
 void PMDManager::SkinUpdate(const std::map<std::string, std::vector<SkinKeyFrames>>& skindata, const int& frame)
 {
 	// Å‰‚Ébase‚Ì•\î‚É–ß‚·
@@ -806,7 +787,19 @@ void PMDManager::SkinUpdate(const std::map<std::string, std::vector<SkinKeyFrame
 			float b = (float)nextFrameIt->frameNo;
 			float t = (static_cast<float>(frame - a)) / (b - a);	// •âŠÔ
 
-			ChangeSkin(skinAnim.first.c_str(), frameIt->weight, nextFrameIt->weight, t);
+			float weight = 0.0f;
+			if (frameIt->weight == nextFrameIt->weight)
+			{
+				weight = frameIt->weight;
+			}
+			else
+			{
+				weight = nextFrameIt->weight - frameIt->weight;
+				weight *= t;
+				weight += frameIt->weight;
+			}
+
+			ChangeSkin(skinAnim.first.c_str(), weight);
 		}
 	}
 

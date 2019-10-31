@@ -59,7 +59,7 @@ void VMDLoader::InitAnimationData()
 	// 対象の骨に追加
 	for (auto& f : motiondatas)
 	{
-		notSortAnimData[f.boneName].emplace_back(BoneKeyFrames(f.frameNo, f.rotation));
+		notSortAnimData[f.boneName].emplace_back(BoneKeyFrames(f.frameNo, f.location, f.rotation));
 	}
 
 	// ソート
@@ -70,7 +70,7 @@ void VMDLoader::InitAnimationData()
 
 		if (frameNo.size() == 1)
 		{
-			animationData[bonename].emplace_back(BoneKeyFrames(frameNo[0].frameNo, frameNo[0].quaternion));
+			animationData[bonename].emplace_back(BoneKeyFrames(frameNo[0].frameNo, frameNo[0].pos, frameNo[0].quaternion));
 			continue;	// アニメーションがないならソートする必要なし
 		}
 
@@ -90,7 +90,7 @@ void VMDLoader::InitAnimationData()
 		for (int i = 0; i < frameNo.size(); i++)
 		{
 			// ソートしたものを追加
-			animationData[bonename].emplace_back(BoneKeyFrames(frameNo[i].frameNo, frameNo[i].quaternion));
+			animationData[bonename].emplace_back(BoneKeyFrames(frameNo[i].frameNo, frameNo[i].pos, frameNo[i].quaternion));
 		}
 	}
 }
