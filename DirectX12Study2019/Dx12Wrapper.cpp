@@ -409,6 +409,8 @@ Dx12Wrapper::Dx12Wrapper(HWND hwnd)
 
 
 	cmdList->Close();
+
+	startTime = GetTickCount64();
 }
 
 Dx12Wrapper::~Dx12Wrapper()
@@ -497,7 +499,7 @@ void Dx12Wrapper::Update()
 
 
 	// ŒÅ’èƒtƒŒ[ƒ€‚É‚·‚é
-	frame = (timeGetTime() - startTime) / 30;
+	frame = (GetTickCount64() - startTime) / 30;
 
 	pmdManager->Update(vmdLoader->GetAnimationData(), vmdLoader->GetSkinData(), frame);
 }

@@ -737,15 +737,12 @@ void PMDManager::MotionUpdate(const std::map<std::string, std::vector<BoneKeyFra
 
 void PMDManager::ChangeSkin(const std::string& skinname, const float& weight)
 {
-	if (weight != 0.000000f)
+	auto data = skinMap[skinname];
+	for (auto& d : data)
 	{
-		auto data = skinMap[skinname];
-		for (auto& d : data)
-		{
-			vertexDatas[d.skinVertIndex].pos.x += d.skinVertPos.x / weight;
-			vertexDatas[d.skinVertIndex].pos.y += d.skinVertPos.y / weight;
-			vertexDatas[d.skinVertIndex].pos.z += d.skinVertPos.z / weight;
-		}
+		vertexDatas[d.skinVertIndex].pos.x += d.skinVertPos.x * weight;
+		vertexDatas[d.skinVertIndex].pos.y += d.skinVertPos.y * weight;
+		vertexDatas[d.skinVertIndex].pos.z += d.skinVertPos.z * weight;
 	}
 }
 
@@ -758,23 +755,17 @@ void PMDManager::ChangeSkin(const std::string& skinname, const float& weight, co
 	}
 	else
 	{
-		float min = (std::min)(weight, nextweight);
-		float max = (std::max)(weight, nextweight);
-		w = max - min;
+		w = nextweight - weight;
 		w *= t;
 		w += weight;
 	}
 	
-
-	if (w != 0.000000f)
+	auto data = skinMap[skinname];
+	for (auto& d : data)
 	{
-		auto data = skinMap[skinname];
-		for (auto& d : data)
-		{
-			vertexDatas[d.skinVertIndex].pos.x += d.skinVertPos.x / w;
-			vertexDatas[d.skinVertIndex].pos.y += d.skinVertPos.y / w;
-			vertexDatas[d.skinVertIndex].pos.z += d.skinVertPos.z / w;
-		}
+		vertexDatas[d.skinVertIndex].pos.x += d.skinVertPos.x * w;
+		vertexDatas[d.skinVertIndex].pos.y += d.skinVertPos.y * w;
+		vertexDatas[d.skinVertIndex].pos.z += d.skinVertPos.z * w;
 	}
 }
 

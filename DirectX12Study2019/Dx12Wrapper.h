@@ -101,7 +101,7 @@ private:
 	std::shared_ptr<VMDLoader> vmdLoader;
 	std::string vmdPath;	// vmd‚ÌƒpƒX
 
-	unsigned int startTime = timeGetTime();
+	unsigned int startTime;
 	unsigned int frame = 0;
 	
 public:
