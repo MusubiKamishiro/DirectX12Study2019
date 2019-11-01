@@ -691,6 +691,29 @@ void PMDManager::RotateBone(const std::string& bonename, const DirectX::XMFLOAT4
 		DirectX::XMMatrixTranslationFromVector(vec);
 }
 
+void PMDManager::Transformation(const std::string& bonename, const DirectX::XMFLOAT3& pos, const DirectX::XMFLOAT3& nextpos, float t)
+{
+	auto a = boneMap.find(bonename);
+	if (a == boneMap.end())
+	{
+		return;
+	}
+
+	DirectX::XMFLOAT3 p;
+	p.x = nextpos.x - pos.x;
+	p.y = nextpos.y - pos.y;
+	p.z = nextpos.z - pos.z;
+	p.x *= t;
+	p.y *= t;
+	p.z *= t;
+	p.x += pos.x;
+	p.y += pos.y;
+	p.z += pos.z;
+
+	auto& center = boneMap["センター"];
+	boneMatrices[center.boneIdx] *= DirectX::XMMatrixTranslation(p.x, p.y, p.z);
+}
+
 void PMDManager::MotionUpdate(const std::map<std::string, std::vector<BoneKeyFrames>>& animationdata, const int& frame)
 {
 	// 最初に初期化
@@ -711,7 +734,13 @@ void PMDManager::MotionUpdate(const std::map<std::string, std::vector<BoneKeyFra
 			// 対象のものがなければやり直し
 			continue;
 		}
-		auto nextFrameIt = frameIt.base();				// 現在のフレームに近い次のフレーム
+		auto nextFrameIt = frameIt.base();	// 現在のフレームに近い次のフレーム
+		
+		// 移動
+		//float f = (float)frameIt->frameNo;
+		//float nextf = (float)nextFrameIt->frameNo;
+		//float t = (static_cast<float>(frame - f)) / (nextf - f);	// 補間
+
 
 		// 現在のフレームと次のフレームが同じならそのまま回す
 		if (nextFrameIt == keyframe.end())
@@ -728,6 +757,8 @@ void PMDManager::MotionUpdate(const std::map<std::string, std::vector<BoneKeyFra
 
 			RotateBone(boneAnim.first.c_str(), frameIt->quaternion, nextFrameIt->quaternion, t);
 		}
+
+		//Transformation(boneAnim.first.c_str(), frameIt->pos, nextFrameIt->pos, t);
 	}
 
 	// ツリーをトラバース
@@ -775,7 +806,7 @@ void PMDManager::SkinUpdate(const std::map<std::string, std::vector<SkinKeyFrame
 			// 対象のものがなければやり直し
 			continue;
 		}
-		auto nextFrameIt = frameIt.base();				// 現在のフレームに近い次のフレーム
+		auto nextFrameIt = frameIt.base();	// 現在のフレームに近い次のフレーム
 
 		if (nextFrameIt == keyframe.end())
 		{
@@ -783,9 +814,9 @@ void PMDManager::SkinUpdate(const std::map<std::string, std::vector<SkinKeyFrame
 		}
 		else
 		{
-			float a = (float)frameIt->frameNo;
-			float b = (float)nextFrameIt->frameNo;
-			float t = (static_cast<float>(frame - a)) / (b - a);	// 補間
+			float f = (float)frameIt->frameNo;
+			float nextf = (float)nextFrameIt->frameNo;
+			float t = (static_cast<float>(frame - f)) / (nextf - f);	// 補間
 
 			float weight = 0.0f;
 			if (frameIt->weight == nextFrameIt->weight)

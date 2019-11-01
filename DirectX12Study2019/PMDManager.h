@@ -188,6 +188,9 @@ private:
 	void RotateBone(const std::string& bonename, const DirectX::XMFLOAT4& quaternion);
 	void RotateBone(const std::string& bonename, const DirectX::XMFLOAT4& q, const DirectX::XMFLOAT4& nextq, float t = 0.0f);
 
+	// ˆÚ“®
+	void Transformation(const std::string& bonename, const DirectX::XMFLOAT3& pos, const DirectX::XMFLOAT3& nextpos, float t);
+
 	void MotionUpdate(const std::map<std::string, std::vector<BoneKeyFrames>>& animationdata, const int& frame);
 
 	void ChangeSkin(const std::string& skinname, const float& weight);
