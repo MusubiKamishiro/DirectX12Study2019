@@ -24,6 +24,33 @@ struct VMDSkinData
 	float weight;			// 表情の設定値(表情スライダーの値)
 };
 
+// カメラデータ
+struct VMDCameraData
+{
+	unsigned int frameNo;			// フレーム番号
+	float length;					// -(距離)
+	DirectX::XMFLOAT3 location;		// 位置
+	DirectX::XMFLOAT3 rotation;		// オイラー角 // X軸は符号が反転しているので注意 // 回転
+	char interpolation[24];			// おそらく[6][4](未検証) // 補完
+	unsigned int viewIngAngle;		// 視界角
+	char perspective;				// 0:on 1:off // パースペクティブ
+};
+
+// 照明データ
+struct VMDLightData
+{
+	unsigned int frameNo;		// フレーム番号
+	DirectX::XMFLOAT3 color;	// RGB各値/256
+	DirectX::XMFLOAT3 location;	// X, Y, Z
+};
+
+// セルフシャドウデータ
+struct VMDSelfShadowData
+{
+	unsigned int frameNo;	// フレーム番号
+	char mode;				// 00-02 // モード
+	float distance;			// 0.1 - (dist * 0.00001) // 距離
+};
 
 // フレームの位置と回転情報
 struct BoneKeyFrames
@@ -51,6 +78,9 @@ private:
 	void Load(const std::string& filepath);
 	std::vector<VMDMotionData> motiondatas;
 	std::vector<VMDSkinData> skindatas;
+	std::vector<VMDCameraData> cameradatas;
+	std::vector<VMDLightData> lightdatas;
+	std::vector<VMDSelfShadowData> selfshadowdatas;
 
 	// アニメーションデータの初期化
 	void InitAnimationData();
