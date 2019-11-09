@@ -56,8 +56,8 @@ private:
 	D3D12_VIEWPORT viewport;	// ビューポート
 	D3D12_RECT scissorRect;		// シザーレクト
 	// ルートシグネチャの初期化
-	void InitRootSignatur();
-	ID3D12RootSignature* rootSignature = nullptr;	// これが最終的に欲しいオブジェクト
+	void InitRootSignature();
+	ID3D12RootSignature* rootSignature = nullptr;
 	// パイプラインステートの初期化
 	void InitPipelineState();
 	ID3D12PipelineState* pipelineState = nullptr;
@@ -79,6 +79,33 @@ private:
 	void ExecuteCmd();
 	// 待ち
 	void WaitExecute();
+
+
+	// 1パス目の作成
+	void CreateFirstPassBuff();
+	ID3D12DescriptorHeap* heapFor1stPassRTV;
+	ID3D12DescriptorHeap* heapFor1stPassSRV;
+	ID3D12Resource* firstPassBuff;
+
+	// スクリーン(ペラポリ)テクスチャ作成
+	void CreateScreenTexture();
+	ID3D12Resource* screenVertexBuffer = nullptr;	// 頂点バッファ
+	ID3D12Resource* screenIndexBuffer = nullptr;	// インデックスバッファ
+	D3D12_VERTEX_BUFFER_VIEW svbView = {};			// 頂点バッファビュー
+	D3D12_INDEX_BUFFER_VIEW sibView = {};			// インデックスバッファビュー
+
+	// ペラポリ用のルートシグネチャ作成
+	void InitPeraRootSignature();
+	ID3D12RootSignature* peraRootSignature = nullptr;
+	// ペラポリ用パイプラインステートの初期化
+	void InitPeraPipelineState();
+	ID3D12PipelineState* peraPipelineState = nullptr;
+
+	// ペラポリ用シェーダーの初期化
+	void InitPeraShader();
+	ID3DBlob* peraVertexShader = nullptr;	// 頂点シェーダ
+	ID3DBlob* peraPixelShader = nullptr;	// ピクセルシェーダ
+
 	
 	ID3D12DescriptorHeap* rtvDescriptorHeap = nullptr;	// レンダーターゲットビュー用のヒープ
 	std::vector<ID3D12Resource*> backBuffers;
