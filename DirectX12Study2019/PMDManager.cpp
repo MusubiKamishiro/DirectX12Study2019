@@ -347,7 +347,7 @@ void PMDManager::CreateToonTexture(const std::string& filepath)
 	toonBuff.resize(10);
 
 	// トゥーン読み込み&書き込み
-	for (int i = 0; i < toonBuff.size(); i++)
+	for (int i = 0; i < toonBuff.size(); ++i)
 	{
 		size_t spoint = filepath.rfind("/");		// "/"の場所を探る
 		std::string modelToon = filepath.substr(0, spoint + 1);
@@ -486,7 +486,7 @@ void PMDManager::CreateBone()
 	std::fill(boneMatrices.begin(), boneMatrices.end(), DirectX::XMMatrixIdentity());
 
 	// マップ情報を構築
-	for (int idx = 0; idx < bones.size(); idx++)
+	for (int idx = 0; idx < bones.size(); ++idx)
 	{
 		auto& b = bones[idx];
 		auto& bNode = boneMap[b.boneName];
@@ -553,7 +553,7 @@ void PMDManager::CreateSkin()
 
 	// base以外の情報
 	// この時点で頂点インデックスを全体のものに合わせる
-	for (int idx = 1; idx < skinDatas.size(); idx++)
+	for (int idx = 1; idx < skinDatas.size(); ++idx)
 	{
 		skin = skinDatas[idx];
 		auto& sNode = skinMap[skin.skinName]; 
@@ -679,7 +679,7 @@ void PMDManager::RotateBone(const std::string& bonename, const DirectX::XMFLOAT4
 										* DirectX::XMMatrixRotationQuaternion(q) * DirectX::XMMatrixTranslationFromVector(vec);
 }
 
-void PMDManager::RotateBone(const std::string& bonename, const DirectX::XMFLOAT4& q, const DirectX::XMFLOAT4& nextq, float t)
+void PMDManager::RotateBone(const std::string& bonename, const DirectX::XMFLOAT4& q, const DirectX::XMFLOAT4& nextq, const float& t)
 {
 	auto& bonenode = boneMap[bonename];
 	auto vec = DirectX::XMLoadFloat3(&bonenode.startPos);
@@ -691,24 +691,12 @@ void PMDManager::RotateBone(const std::string& bonename, const DirectX::XMFLOAT4
 		DirectX::XMMatrixTranslationFromVector(vec);
 }
 
-void PMDManager::Transformation(const std::string& bonename, const DirectX::XMFLOAT3& pos, const DirectX::XMFLOAT3& nextpos, float t)
+void PMDManager::Transformation(const DirectX::XMFLOAT3& pos, const DirectX::XMFLOAT3& nextpos, float t)
 {
-	auto a = boneMap.find(bonename);
-	if (a == boneMap.end())
-	{
-		return;
-	}
-
 	DirectX::XMFLOAT3 p;
-	p.x = nextpos.x - pos.x;
-	p.y = nextpos.y - pos.y;
-	p.z = nextpos.z - pos.z;
-	p.x *= t;
-	p.y *= t;
-	p.z *= t;
-	p.x += pos.x;
-	p.y += pos.y;
-	p.z += pos.z;
+	p.x = (nextpos.x - pos.x) * t + pos.x;
+	p.y = (nextpos.y - pos.y) * t + pos.y;
+	p.z = (nextpos.z - pos.z) * t + pos.z;
 
 	auto& center = boneMap["センター"];
 	boneMatrices[center.boneIdx] *= DirectX::XMMatrixTranslation(p.x, p.y, p.z);
@@ -736,12 +724,14 @@ void PMDManager::MotionUpdate(const std::map<std::string, std::vector<BoneKeyFra
 		}
 		auto nextFrameIt = frameIt.base();	// 現在のフレームに近い次のフレーム
 		
-		// 移動
-		//float f = (float)frameIt->frameNo;
-		//float nextf = (float)nextFrameIt->frameNo;
-		//float t = (static_cast<float>(frame - f)) / (nextf - f);	// 補間
-
-
+		// モデルの中に対象の骨がなければ以下の処理を通さない
+		// std::mapの仕様でない骨が作られてしまい、予想外の挙動を起こすため
+		auto name = boneMap.find(boneAnim.first.c_str());
+		if (name == boneMap.end())
+		{
+			continue;
+		}
+		
 		// 現在のフレームと次のフレームが同じならそのまま回す
 		if (nextFrameIt == keyframe.end())
 		{
@@ -756,9 +746,9 @@ void PMDManager::MotionUpdate(const std::map<std::string, std::vector<BoneKeyFra
 			float t = (static_cast<float>(frame - a)) / (b - a);	// 補間
 
 			RotateBone(boneAnim.first.c_str(), frameIt->quaternion, nextFrameIt->quaternion, t);
+			// 移動
+			Transformation(frameIt->pos, nextFrameIt->pos, t);
 		}
-
-		//Transformation(boneAnim.first.c_str(), frameIt->pos, nextFrameIt->pos, t);
 	}
 
 	// ツリーをトラバース
@@ -825,9 +815,7 @@ void PMDManager::SkinUpdate(const std::map<std::string, std::vector<SkinKeyFrame
 			}
 			else
 			{
-				weight = nextFrameIt->weight - frameIt->weight;
-				weight *= t;
-				weight += frameIt->weight;
+				weight = (nextFrameIt->weight - frameIt->weight) * t + frameIt->weight;
 			}
 
 			ChangeSkin(skinAnim.first.c_str(), weight);

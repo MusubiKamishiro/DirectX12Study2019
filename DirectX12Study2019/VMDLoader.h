@@ -52,6 +52,22 @@ struct VMDSelfShadowData
 	float distance;			// 0.1 - (dist * 0.00001) // 距離
 };
 
+// IKデータ用構造体
+struct VMDIKData
+{
+	char ikBoneName[20];		// IKボーン名
+	unsigned char ikEnabled;	// IK有効	// 0:off, 1:on
+};
+
+// 表示・IKデータ用構造
+struct VMDVisibleIKData
+{
+	int frameNo = 0;				// フレーム番号
+	unsigned char visible = 0;		// 表示	// 0:off, 1:on
+	int ikCount = 0;				// IK数
+	std::vector<VMDIKData> ikDatas;	// IKデータリスト
+};
+
 // フレームの位置と回転情報
 struct BoneKeyFrames
 {
@@ -81,6 +97,7 @@ private:
 	std::vector<VMDCameraData> cameradatas;
 	std::vector<VMDLightData> lightdatas;
 	std::vector<VMDSelfShadowData> selfshadowdatas;
+	std::vector<VMDVisibleIKData> visibleIKDatas;
 
 	// アニメーションデータの初期化
 	void InitAnimationData();

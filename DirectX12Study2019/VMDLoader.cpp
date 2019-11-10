@@ -86,6 +86,24 @@ void VMDLoader::Load(const std::string& filepath)
 		fread(&sddata.mode,		sizeof(sddata.mode),		1, fp);
 		fread(&sddata.distance,	sizeof(sddata.distance),	1, fp);
 	}
+
+	// 表示・IKデータ数読み込み
+	int dataCount = 0;
+	fread(&dataCount, sizeof(dataCount), 1, fp);
+	visibleIKDatas.resize(dataCount);
+	// 表示・IKデータ読み込み
+	for (auto& visible : visibleIKDatas)
+	{
+		fread(&visible.frameNo, sizeof(visible.frameNo), 1, fp);
+		fread(&visible.visible, sizeof(visible.visible), 1, fp);
+		fread(&visible.ikCount, sizeof(visible.ikCount), 1, fp);
+		visible.ikDatas.resize(visible.ikCount);
+		for (auto& ik : visible.ikDatas)
+		{
+			fread(&ik.ikBoneName,	sizeof(ik.ikBoneName),	1, fp);
+			fread(&ik.ikEnabled,	sizeof(ik.ikEnabled),	1, fp);
+		}
+	}
 }
 
 void VMDLoader::InitAnimationData()
@@ -109,9 +127,9 @@ void VMDLoader::InitAnimationData()
 			continue;	// アニメーションがないならソートする必要なし
 		}
 
-		for (int i = 0; i < frameNo.size() - 1; i++)
+		for (int i = 0; i < frameNo.size() - 1; ++i)
 		{
-			for (int j = i; j < frameNo.size(); j++)
+			for (int j = i; j < frameNo.size(); ++j)
 			{
 				if (frameNo[i].frameNo > frameNo[j].frameNo)
 				{
@@ -122,7 +140,7 @@ void VMDLoader::InitAnimationData()
 				}
 			}
 		}
-		for (int i = 0; i < frameNo.size(); i++)
+		for (int i = 0; i < frameNo.size(); ++i)
 		{
 			// ソートしたものを追加
 			animationData[bonename].emplace_back(BoneKeyFrames(frameNo[i].frameNo, frameNo[i].pos, frameNo[i].quaternion));
@@ -150,9 +168,9 @@ void VMDLoader::InitSkinData()
 			continue;
 		}
 
-		for (int i = 0; i < frameNo.size() - 1; i++)
+		for (int i = 0; i < frameNo.size() - 1; ++i)
 		{
-			for (int j = i; j < frameNo.size(); j++)
+			for (int j = i; j < frameNo.size(); ++j)
 			{
 				if (frameNo[i].frameNo > frameNo[j].frameNo)
 				{
@@ -163,7 +181,7 @@ void VMDLoader::InitSkinData()
 				}
 			}
 		}
-		for (int i = 0; i < frameNo.size(); i++)
+		for (int i = 0; i < frameNo.size(); ++i)
 		{
 			// ソートしたものを追加
 			skinData[skinname].emplace_back(SkinKeyFrames(frameNo[i].frameNo, frameNo[i].weight));

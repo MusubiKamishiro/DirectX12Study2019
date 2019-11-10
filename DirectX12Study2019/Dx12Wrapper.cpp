@@ -516,7 +516,6 @@ void Dx12Wrapper::InitPeraPipelineState()
 
 	// パイプラインステートを作る
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC gpsDesc = {};
-
 	// ルートシグネチャと頂点レイアウト
 	gpsDesc.pRootSignature = peraRootSignature;
 	gpsDesc.InputLayout.pInputElementDescs = layouts;
@@ -585,8 +584,8 @@ Dx12Wrapper::Dx12Wrapper(HWND hwnd)
 	// VMDの読み込み
 	//vmdPath = "motion/pose.vmd";
 	//vmdPath = "motion/charge.vmd";
-	vmdPath = "motion/Miku.vmd";	// 気まぐれメルシィ
-	//vmdPath = "motion/ヤゴコロダンス.vmd";
+	//vmdPath = "motion/Miku.vmd";	// 気まぐれメルシィ
+	vmdPath = "motion/ヤゴコロダンス.vmd";
 	//vmdPath = "motion/PBA_Solo.vmd";// Princess Be Ambitious!!
 	vmdLoader.reset(new VMDLoader(vmdPath));
 
@@ -603,6 +602,7 @@ Dx12Wrapper::Dx12Wrapper(HWND hwnd)
 	cmdList->Close();
 
 	startTime = GetTickCount64();
+	maxFrame = vmdLoader->GetMaxFrame();
 }
 
 Dx12Wrapper::~Dx12Wrapper()
@@ -698,9 +698,9 @@ void Dx12Wrapper::Update()
 
 
 	// 固定フレームにする
-	frame = (GetTickCount64() - startTime) / 30;
+	frame = ((GetTickCount64() - startTime) / 30) % maxFrame;
 
-	pmdManager->Update(vmdLoader->GetAnimationData(), vmdLoader->GetSkinData(), frame);
+	pmdManager->Update(vmdLoader->GetAnimationData(), vmdLoader->GetSkinData(), frame /*% maxFrame*/);
 }
 
 void Dx12Wrapper::Draw()

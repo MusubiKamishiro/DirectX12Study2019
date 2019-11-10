@@ -52,7 +52,7 @@ struct PMDMaterialData
 struct PMDIKData
 {
 	unsigned short ikBoneIndex;			// IKボーン番号
-	unsigned short ikTargetBoneIndex;		// IKターゲットボーン番号	// IKボーンが最初に接続するボーン
+	unsigned short ikTargetBoneIndex;	// IKターゲットボーン番号	// IKボーンが最初に接続するボーン
 	char ikChainLength;					// IKチェーンの長さ(子の数)
 	unsigned short iterations;			// 再帰演算回数				// IK値1
 	float controlWeight;				// 演算1回あたりの制限角度	// IK値2
@@ -62,7 +62,7 @@ struct PMDIKData
 // 表情用の頂点データ
 struct PMDSkinVertData
 {
-	unsigned int skinVertIndex = 0;	// 表情用の頂点の番号(頂点リストにある番号)
+	unsigned int skinVertIndex;	// 表情用の頂点の番号(頂点リストにある番号)
 	DirectX::XMFLOAT3 skinVertPos;	// x, y, z // 表情用の頂点の座標(頂点自体の座標)
 };
 
@@ -186,10 +186,10 @@ private:
 	// 骨を回転させる
 	//@param quaternion
 	void RotateBone(const std::string& bonename, const DirectX::XMFLOAT4& quaternion);
-	void RotateBone(const std::string& bonename, const DirectX::XMFLOAT4& q, const DirectX::XMFLOAT4& nextq, float t = 0.0f);
+	void RotateBone(const std::string& bonename, const DirectX::XMFLOAT4& q, const DirectX::XMFLOAT4& nextq, const float& t = 0.0f);
 
 	// 移動
-	void Transformation(const std::string& bonename, const DirectX::XMFLOAT3& pos, const DirectX::XMFLOAT3& nextpos, float t);
+	void Transformation(const DirectX::XMFLOAT3& pos, const DirectX::XMFLOAT3& nextpos, float t);
 
 	void MotionUpdate(const std::map<std::string, std::vector<BoneKeyFrames>>& animationdata, const int& frame);
 

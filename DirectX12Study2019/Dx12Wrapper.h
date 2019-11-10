@@ -130,6 +130,7 @@ private:
 
 	unsigned int startTime;
 	unsigned int frame = 0;
+	unsigned int maxFrame = 0;
 	
 public:
 	Dx12Wrapper(HWND hwnd);

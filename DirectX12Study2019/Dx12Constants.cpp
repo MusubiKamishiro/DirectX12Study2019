@@ -23,7 +23,7 @@ Dx12Constants::Dx12Constants()
 	mappedMatrix.world = world;
 
 	// カメラの設定
-	auto eyePos = DirectX::XMFLOAT3(0, 20, -15);	// カメラの位置(視点)
+	auto eyePos = DirectX::XMFLOAT3(0, 20, -30);	// カメラの位置(視点)
 	auto focusPos = DirectX::XMFLOAT3(0, 10, 0);	// 焦点の位置(注視点)
 	auto up = DirectX::XMFLOAT3(0.0f, 1.0f, 0.0f);	// カメラの上方向(通常は(0.0f, 1.0f, 0.0f))	// カメラを固定するためのもの
 
