@@ -101,12 +101,14 @@ private:
 
 	// アニメーションデータの初期化
 	void InitAnimationData();
-	// <ボーン名, フレーム位置と回転情報>
-	std::map<std::string, std::vector<BoneKeyFrames>> animationData;
+	std::map<std::string, std::vector<BoneKeyFrames>> animationData;	// <ボーン名, フレーム位置と回転情報>
 
 	// 表情データの初期化
 	void InitSkinData();
 	std::map<std::string, std::vector<SkinKeyFrames>> skinData;
+
+	// カメラデータをフレーム順にソート
+	void SortCameraData();
 
 	// モーションの時間を求める
 	void SearchMaxFrame();
@@ -119,5 +121,6 @@ public:
 	const std::map<std::string, std::vector<BoneKeyFrames>>& GetAnimationData()const;
 	const std::map<std::string, std::vector<SkinKeyFrames>>& GetSkinData()const;
 	const int GetMaxFrame()const;
+	const std::vector<VMDCameraData>& GetCameraData()const;
 };
 

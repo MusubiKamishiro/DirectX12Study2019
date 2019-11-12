@@ -9,8 +9,8 @@
 #include "PMDManager.h"
 #include "VMDLoader.h"
 
-#pragma comment(lib,"d3d12.lib")
-#pragma comment(lib,"dxgi.lib")
+#pragma comment(lib, "d3d12.lib")
+#pragma comment(lib, "dxgi.lib")
 #pragma comment(lib, "d3dcompiler.lib")
 #pragma comment(lib, "DirectXTex.lib")
 #pragma comment(lib, "winmm.lib")
@@ -589,6 +589,10 @@ Dx12Wrapper::Dx12Wrapper(HWND hwnd)
 	//vmdPath = "motion/PBA_Solo.vmd";// Princess Be Ambitious!!
 	vmdLoader.reset(new VMDLoader(vmdPath));
 
+	// VMD(ƒJƒƒ‰)‚Ì“Ç‚Ýž‚Ý
+	cameraPath = "motion/camera.vmd";
+	vmdCamera.reset(new VMDLoader(cameraPath));
+
 	CreateDepthBuff();
 	
 	CreateFirstPassBuff();
@@ -700,7 +704,7 @@ void Dx12Wrapper::Update()
 	// ŒÅ’èƒtƒŒ[ƒ€‚É‚·‚é
 	frame = ((GetTickCount64() - startTime) / 30) % maxFrame;
 
-	pmdManager->Update(vmdLoader->GetAnimationData(), vmdLoader->GetSkinData(), frame /*% maxFrame*/);
+	pmdManager->Update(vmdLoader->GetAnimationData(), vmdLoader->GetSkinData(), frame);
 }
 
 void Dx12Wrapper::Draw()

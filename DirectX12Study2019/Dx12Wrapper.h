@@ -121,12 +121,16 @@ private:
 	D3D12_RESOURCE_BARRIER BarrierDesc = {};	// バリア
 
 	// PMD関連
-	std::string modelPath;	// モデルのパス
 	std::shared_ptr<PMDManager> pmdManager;
+	std::string modelPath;	// モデルのパス
 
 	// VMD
 	std::shared_ptr<VMDLoader> vmdLoader;
 	std::string vmdPath;	// vmdのパス
+
+	// カメラVMD
+	std::shared_ptr<VMDLoader> vmdCamera;
+	std::string cameraPath;
 
 	unsigned int startTime;
 	unsigned int frame = 0;

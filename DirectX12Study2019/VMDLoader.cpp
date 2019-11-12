@@ -6,6 +6,10 @@ VMDLoader::VMDLoader(const std::string& filepath)
 	Load(filepath);
 	InitAnimationData();
 	InitSkinData();
+	if (cameradatas.size())
+	{
+		SortCameraData();
+	}
 	SearchMaxFrame();
 }
 
@@ -189,6 +193,23 @@ void VMDLoader::InitSkinData()
 	}
 }
 
+void VMDLoader::SortCameraData()
+{
+	for (int i = 0; i < cameradatas.size() - 1; ++i)
+	{
+		for (int j = i; j < cameradatas.size(); ++j)
+		{
+			if (cameradatas[i].frameNo > cameradatas[j].frameNo)
+			{
+				auto camera = cameradatas[i];
+
+				cameradatas[i] = cameradatas[j];
+				cameradatas[j] = camera;
+			}
+		}
+	}
+}
+
 void VMDLoader::SearchMaxFrame()
 {
 	for (auto& anim : animationData)
@@ -215,4 +236,9 @@ const std::map<std::string, std::vector<SkinKeyFrames>>& VMDLoader::GetSkinData(
 const int VMDLoader::GetMaxFrame() const
 {
 	return maxFrame;
+}
+
+const std::vector<VMDCameraData>& VMDLoader::GetCameraData() const
+{
+	return cameradatas;
 }
