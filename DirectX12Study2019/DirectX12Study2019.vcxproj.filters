@@ -83,7 +83,7 @@
     <FxCompile Include="Shader.hlsl">
       <Filter>シェーダ ファイル</Filter>
     </FxCompile>
-    <FxCompile Include="PeraShader.hlsl">
+    <FxCompile Include="LastShader.hlsl">
       <Filter>シェーダ ファイル</Filter>
     </FxCompile>
   </ItemGroup>

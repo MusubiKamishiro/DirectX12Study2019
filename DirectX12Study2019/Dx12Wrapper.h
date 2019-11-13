@@ -94,17 +94,17 @@ private:
 	D3D12_VERTEX_BUFFER_VIEW svbView = {};			// 頂点バッファビュー
 	D3D12_INDEX_BUFFER_VIEW sibView = {};			// インデックスバッファビュー
 
-	// ペラポリ用のルートシグネチャ作成
-	void InitPeraRootSignature();
-	ID3D12RootSignature* peraRootSignature = nullptr;
-	// ペラポリ用パイプラインステートの初期化
-	void InitPeraPipelineState();
-	ID3D12PipelineState* peraPipelineState = nullptr;
+	// 最終描画用のルートシグネチャ作成
+	void InitLastRootSignature();
+	ID3D12RootSignature* lastRootSignature = nullptr;
+	// 最終描画用パイプラインステートの初期化
+	void InitLastPipelineState();
+	ID3D12PipelineState* lastPipelineState = nullptr;
 
-	// ペラポリ用シェーダーの初期化
-	void InitPeraShader();
-	ID3DBlob* peraVertexShader = nullptr;	// 頂点シェーダ
-	ID3DBlob* peraPixelShader = nullptr;	// ピクセルシェーダ
+	// 最終描画用シェーダーの初期化
+	void InitLastShader();
+	ID3DBlob* lastVertexShader = nullptr;	// 頂点シェーダ
+	ID3DBlob* lastPixelShader = nullptr;	// ピクセルシェーダ
 
 	
 	ID3D12DescriptorHeap* rtvDescriptorHeap = nullptr;	// レンダーターゲットビュー用のヒープ
@@ -121,11 +121,11 @@ private:
 	D3D12_RESOURCE_BARRIER BarrierDesc = {};	// バリア
 
 	// PMD関連
-	std::shared_ptr<PMDManager> pmdManager;
+	std::vector<std::shared_ptr<PMDManager>> pmdManagers;
 	std::string modelPath;	// モデルのパス
 
 	// VMD
-	std::shared_ptr<VMDLoader> vmdLoader;
+	std::vector<std::shared_ptr<VMDLoader>> vmdLoaders;
 	std::string vmdPath;	// vmdのパス
 
 	// カメラVMD

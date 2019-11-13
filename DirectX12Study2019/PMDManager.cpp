@@ -163,23 +163,23 @@ void PMDManager::Load(const std::string& filepath)
 		}
 	}
 
-	// 表示用表情(今は省略)
+	// 表示用表情(省略)
 	unsigned char skinDispNum = 0;
 	fread(&skinDispNum, sizeof(skinDispNum), 1, fp);
 	fseek(fp, skinDispNum * sizeof(unsigned short), SEEK_CUR);
 
-	// 表示用ボーン名(今は省略)
+	// 表示用ボーン名(省略)
 	unsigned char boneDispNum = 0;
 	fread(&boneDispNum, sizeof(boneDispNum), 1, fp);
 	fseek(fp, 50 * boneDispNum, SEEK_CUR);
 
-	// 表示ボーンリスト(今は省略)
+	// 表示ボーンリスト(省略)
 	unsigned int dispBoneNum = 0;
 	fread(&dispBoneNum, sizeof(dispBoneNum), 1, fp);
 	fseek(fp, 3 * dispBoneNum, SEEK_CUR);
 
 	// 英名
-	// 英名対応フラグ(今は省略)
+	// 英名対応フラグ(省略)
 	unsigned char englishFlg = 0;
 	fread(&englishFlg, sizeof(englishFlg), 1, fp);
 	if (englishFlg)
@@ -848,8 +848,7 @@ void PMDManager::Draw(ID3D12GraphicsCommandList* cmdList)
 
 	// 骨をセット
 	cmdList->SetDescriptorHeaps(1, &boneHeap);
-	auto boneHeapHandle = boneHeap->GetGPUDescriptorHandleForHeapStart();
-	cmdList->SetGraphicsRootDescriptorTable(2, boneHeapHandle);	// 第一引数はｽﾛｯﾄ番号
+	cmdList->SetGraphicsRootDescriptorTable(2, boneHeap->GetGPUDescriptorHandleForHeapStart());
 
 	// モデルの描画
 	unsigned int offset = 0;

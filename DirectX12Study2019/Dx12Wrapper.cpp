@@ -459,7 +459,7 @@ void Dx12Wrapper::CreateScreenTexture()
 	svbView.SizeInBytes = sizeof(vertices);	// データ全体のサイズ
 }
 
-void Dx12Wrapper::InitPeraRootSignature()
+void Dx12Wrapper::InitLastRootSignature()
 {
 	D3D12_DESCRIPTOR_RANGE descRange[1] = {};
 	// "t0" テクスチャ
@@ -501,10 +501,10 @@ void Dx12Wrapper::InitPeraRootSignature()
 	auto result = D3D12SerializeRootSignature(&rsd, D3D_ROOT_SIGNATURE_VERSION_1, &signature, &error);
 
 	// ルートシグネチャの作成
-	result = Dx12Device::Instance().GetDevice()->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&peraRootSignature));
+	result = Dx12Device::Instance().GetDevice()->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&lastRootSignature));
 }
 
-void Dx12Wrapper::InitPeraPipelineState()
+void Dx12Wrapper::InitLastPipelineState()
 {
 	// 頂点レイアウト
 	D3D12_INPUT_ELEMENT_DESC layouts[] = {
@@ -517,12 +517,12 @@ void Dx12Wrapper::InitPeraPipelineState()
 	// パイプラインステートを作る
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC gpsDesc = {};
 	// ルートシグネチャと頂点レイアウト
-	gpsDesc.pRootSignature = peraRootSignature;
+	gpsDesc.pRootSignature = lastRootSignature;
 	gpsDesc.InputLayout.pInputElementDescs = layouts;
 	gpsDesc.InputLayout.NumElements = _countof(layouts);
 	// シェーダ系
-	gpsDesc.VS = CD3DX12_SHADER_BYTECODE(peraVertexShader);	// 頂点シェーダ
-	gpsDesc.PS = CD3DX12_SHADER_BYTECODE(peraPixelShader);	// ピクセルシェーダ
+	gpsDesc.VS = CD3DX12_SHADER_BYTECODE(lastVertexShader);	// 頂点シェーダ
+	gpsDesc.PS = CD3DX12_SHADER_BYTECODE(lastPixelShader);	// ピクセルシェーダ
 	// レンダターゲット
 	gpsDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;		// このターゲット数と設定するフォーマット数は
 	gpsDesc.NumRenderTargets = 1;							// 一致させておく
@@ -543,18 +543,18 @@ void Dx12Wrapper::InitPeraPipelineState()
 	gpsDesc.SampleMask = 0xffffffff;	// 全部1
 	gpsDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;	// 三角形
 
-	auto result = Dx12Device::Instance().GetDevice()->CreateGraphicsPipelineState(&gpsDesc, IID_PPV_ARGS(&peraPipelineState));
+	auto result = Dx12Device::Instance().GetDevice()->CreateGraphicsPipelineState(&gpsDesc, IID_PPV_ARGS(&lastPipelineState));
 }
 
-void Dx12Wrapper::InitPeraShader()
+void Dx12Wrapper::InitLastShader()
 {
-	auto result = D3DCompileFromFile(L"PeraShader.hlsl", nullptr, nullptr, "vs", "vs_5_0",
-		D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION, 0, &peraVertexShader, nullptr);
-	result = D3DCompileFromFile(L"PeraShader.hlsl", nullptr, nullptr, "ps", "ps_5_0",
-		D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION, 0, &peraPixelShader, nullptr);
+	auto result = D3DCompileFromFile(L"LastShader.hlsl", nullptr, nullptr, "vs", "vs_5_0",
+		D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION, 0, &lastVertexShader, nullptr);
+	result = D3DCompileFromFile(L"LastShader.hlsl", nullptr, nullptr, "ps", "ps_5_0",
+		D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION, 0, &lastPixelShader, nullptr);
 
-	InitPeraRootSignature();
-	InitPeraPipelineState();
+	InitLastRootSignature();
+	InitLastPipelineState();
 }
 
 Dx12Wrapper::Dx12Wrapper(HWND hwnd)
@@ -579,15 +579,18 @@ Dx12Wrapper::Dx12Wrapper(HWND hwnd)
 	//modelPath = "model/vocaloid/巡音ルカ.pmd";
 	//modelPath = "model/yayoi/やよいヘッド_カジュアル（体x0.96）改造.pmd";
 	//modelPath = "model/hibiki/我那覇響v1.pmd";
-	pmdManager.reset(new PMDManager(modelPath));
+	pmdManagers.emplace_back(new PMDManager(modelPath));
+	pmdManagers.emplace_back(new PMDManager("model/hibiki/我那覇響v1_グラビアミズギ.pmd"));
+
 
 	// VMDの読み込み
 	//vmdPath = "motion/pose.vmd";
 	//vmdPath = "motion/charge.vmd";
-	//vmdPath = "motion/Miku.vmd";	// 気まぐれメルシィ
-	vmdPath = "motion/ヤゴコロダンス.vmd";
+	vmdPath = "motion/Miku.vmd";	// 気まぐれメルシィ
+	//vmdPath = "motion/ヤゴコロダンス.vmd";
 	//vmdPath = "motion/PBA_Solo.vmd";// Princess Be Ambitious!!
-	vmdLoader.reset(new VMDLoader(vmdPath));
+	vmdLoaders.emplace_back(new VMDLoader(vmdPath));
+	vmdLoaders.emplace_back(new VMDLoader("motion/Kimagure Mercy motion配布用/配布用Tda/Teto.vmd"));
 
 	// VMD(カメラ)の読み込み
 	cameraPath = "motion/camera.vmd";
@@ -600,13 +603,13 @@ Dx12Wrapper::Dx12Wrapper(HWND hwnd)
 	//CreateVertexBuffer();
 
 	InitShader();
-	InitPeraShader();
+	InitLastShader();
 
 
 	cmdList->Close();
 
 	startTime = GetTickCount64();
-	maxFrame = vmdLoader->GetMaxFrame();
+	maxFrame = vmdLoaders[0]->GetMaxFrame();
 }
 
 Dx12Wrapper::~Dx12Wrapper()
@@ -625,8 +628,8 @@ Dx12Wrapper::~Dx12Wrapper()
 	heapFor1stPassRTV->Release();
 	heapFor1stPassSRV->Release();
 	firstPassBuff->Release();
-	peraPipelineState->Release();
-	peraRootSignature->Release();
+	lastPipelineState->Release();
+	lastRootSignature->Release();
 
 	//vertexBuffer->Release();
 	//indexBuffer->Release();
@@ -704,11 +707,15 @@ void Dx12Wrapper::Update()
 	// 固定フレームにする
 	frame = ((GetTickCount64() - startTime) / 30) % maxFrame;
 
-	pmdManager->Update(vmdLoader->GetAnimationData(), vmdLoader->GetSkinData(), frame);
+	for (int i = 0; i < pmdManagers.size(); ++i)
+	{
+		pmdManagers[i]->Update(vmdLoaders[i]->GetAnimationData(), vmdLoaders[i]->GetSkinData(), frame);
+	}
 }
 
 void Dx12Wrapper::Draw()
 {
+	/// モデルの描画 ///
 	// 命令のクリア
 	ClearCmd(pipelineState, rootSignature);
 	// ビューポートとシザー設定
@@ -724,9 +731,12 @@ void Dx12Wrapper::Draw()
 	// バリアの解除(ここから書き込みが始まる)
 	UnlockBarrier(firstPassBuff);
 	// 画面のクリア(これも書き込みに入る)
-	cmdList->ClearRenderTargetView(heapStart, clearColor, 0, nullptr);	// 現在WARNINGがでてくる
+	cmdList->ClearRenderTargetView(heapStart, clearColor, 0, nullptr);
 	// モデルの描画
-	pmdManager->Draw(cmdList);
+	for (auto& pmd : pmdManagers)
+	{
+		pmd->Draw(cmdList);
+	}
 	// バリアのセット
 	SetBarrier();
 
@@ -735,8 +745,9 @@ void Dx12Wrapper::Draw()
 	WaitExecute();
 
 
+	/// 最終描画 ///
 	// 命令のクリア
-	ClearCmd(peraPipelineState, peraRootSignature);
+	ClearCmd(lastPipelineState, lastRootSignature);
 	// ビューポートとシザー設定
 	cmdList->RSSetViewports(1, &viewport);
 	cmdList->RSSetScissorRects(1, &scissorRect);
