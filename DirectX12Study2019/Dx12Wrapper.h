@@ -10,6 +10,8 @@
 
 class PMDManager;
 class VMDLoader;
+class PrimitiveManager;
+class Plane;
 
 
 struct Vector3
@@ -122,19 +124,21 @@ private:
 
 	// PMD関連
 	std::vector<std::shared_ptr<PMDManager>> pmdManagers;
-	std::string modelPath;	// モデルのパス
 
 	// VMD
 	std::vector<std::shared_ptr<VMDLoader>> vmdLoaders;
-	std::string vmdPath;	// vmdのパス
 
 	// カメラVMD
 	std::shared_ptr<VMDLoader> vmdCamera;
 	std::string cameraPath;
 
 	unsigned int startTime;
-	unsigned int frame = 0;
-	unsigned int maxFrame = 0;
+	int frame = 0;
+	int maxFrame = 0;
+
+	// 床
+	std::shared_ptr<PrimitiveManager> primitiveManager;
+	std::shared_ptr<Plane> plane;
 	
 public:
 	Dx12Wrapper(HWND hwnd);

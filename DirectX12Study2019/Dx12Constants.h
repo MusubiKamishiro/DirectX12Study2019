@@ -1,6 +1,9 @@
 #pragma once
 #include <d3d12.h>
 #include <DirectXMath.h>
+#include <vector>
+
+#include "VMDLoader.h"
 
 struct WVP
 {
@@ -24,9 +27,13 @@ private:
 	WVP* m = nullptr;
 	WVP mappedMatrix;
 
+	void CameraMove(const VMDCameraData& cameraData, const VMDCameraData& nextCameraData, const float& t);
+
 public:
 	static Dx12Constants& Instance();
 	~Dx12Constants();
+
+	void Update(const std::vector<VMDCameraData>& cameraData, const int& frame);
 
 	ID3D12DescriptorHeap* GetRgstDescriptorHeap()const;
 	WVP* GetMappedMatrix()const;

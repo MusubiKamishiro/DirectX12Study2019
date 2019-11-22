@@ -133,7 +133,10 @@
     <ClCompile Include="Dx12Wrapper.cpp" />
     <ClCompile Include="ImageManager.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="Plane.cpp" />
     <ClCompile Include="PMDManager.cpp" />
+    <ClCompile Include="Primitive.cpp" />
+    <ClCompile Include="PrimitiveManager.cpp" />
     <ClCompile Include="VMDLoader.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -142,7 +145,10 @@
     <ClInclude Include="Dx12Device.h" />
     <ClInclude Include="Dx12Wrapper.h" />
     <ClInclude Include="ImageManager.h" />
+    <ClInclude Include="Plane.h" />
     <ClInclude Include="PMDManager.h" />
+    <ClInclude Include="Primitive.h" />
+    <ClInclude Include="PrimitiveManager.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="VMDLoader.h" />
   </ItemGroup>
@@ -153,6 +159,18 @@
     <Image Include="img\icon.ico" />
   </ItemGroup>
   <ItemGroup>
+    <FxCompile Include="PrimitiveShader.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Effect</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Vertex</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Vertex</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Vertex</ShaderType>
+      <EntryPointName Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+      </EntryPointName>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">5.1</ShaderModel>
+      <EntryPointName Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+      </EntryPointName>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">5.0</ShaderModel>
+    </FxCompile>
     <FxCompile Include="Shader.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Effect</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Effect</ShaderType>

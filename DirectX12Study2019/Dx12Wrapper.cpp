@@ -9,6 +9,9 @@
 #include "PMDManager.h"
 #include "VMDLoader.h"
 
+#include "PrimitiveManager.h"
+#include "Plane.h"
+
 #pragma comment(lib, "d3d12.lib")
 #pragma comment(lib, "dxgi.lib")
 #pragma comment(lib, "d3dcompiler.lib")
@@ -359,7 +362,7 @@ void Dx12Wrapper::SetBarrier()
 void Dx12Wrapper::ExecuteCmd()
 {
 	ID3D12CommandList* cmdLists[] = { cmdList };
-	cmdQueue->ExecuteCommandLists(1, cmdLists);
+	cmdQueue->ExecuteCommandLists(_countof(cmdLists), cmdLists);
 	cmdQueue->Signal(fence, ++fenceValue);
 }
 
@@ -574,23 +577,27 @@ Dx12Wrapper::Dx12Wrapper(HWND hwnd)
 	result = dev->CreateFence(fenceValue, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence));
 	
 	// PMDモデルの読み込み
-	modelPath = "model/vocaloid/初音ミク.pmd";
 	//modelPath = "model/vocaloid/初音ミクmetal.pmd";
 	//modelPath = "model/vocaloid/巡音ルカ.pmd";
-	//modelPath = "model/yayoi/やよいヘッド_カジュアル（体x0.96）改造.pmd";
 	//modelPath = "model/hibiki/我那覇響v1.pmd";
-	pmdManagers.emplace_back(new PMDManager(modelPath));
-	pmdManagers.emplace_back(new PMDManager("model/hibiki/我那覇響v1_グラビアミズギ.pmd"));
-
+	pmdManagers.emplace_back(new PMDManager("model/vocaloid/初音ミク.pmd"));
+	//pmdManagers.emplace_back(new PMDManager("model/hibiki/我那覇響v1_グラビアミズギ.pmd"));
+	//pmdManagers.emplace_back(new PMDManager("model/yayoi/やよいヘッド_カジュアル（体x0.96）改造.pmd"));
+	pmdManagers.emplace_back(new PMDManager("model/vocaloid/初音ミク.pmd"));
+	pmdManagers.emplace_back(new PMDManager("model/vocaloid/初音ミク.pmd"));
+	pmdManagers.emplace_back(new PMDManager("model/vocaloid/初音ミク.pmd"));
+	pmdManagers.emplace_back(new PMDManager("model/vocaloid/初音ミク.pmd"));
 
 	// VMDの読み込み
 	//vmdPath = "motion/pose.vmd";
 	//vmdPath = "motion/charge.vmd";
-	vmdPath = "motion/Miku.vmd";	// 気まぐれメルシィ
 	//vmdPath = "motion/ヤゴコロダンス.vmd";
 	//vmdPath = "motion/PBA_Solo.vmd";// Princess Be Ambitious!!
-	vmdLoaders.emplace_back(new VMDLoader(vmdPath));
+	vmdLoaders.emplace_back(new VMDLoader("motion/Kimagure Mercy motion配布用/配布用Tda/Miku.vmd"));
 	vmdLoaders.emplace_back(new VMDLoader("motion/Kimagure Mercy motion配布用/配布用Tda/Teto.vmd"));
+	vmdLoaders.emplace_back(new VMDLoader("motion/Kimagure Mercy motion配布用/配布用Tda/Luka.vmd"));
+	vmdLoaders.emplace_back(new VMDLoader("motion/Kimagure Mercy motion配布用/配布用Tda/Rin.vmd"));
+	vmdLoaders.emplace_back(new VMDLoader("motion/Kimagure Mercy motion配布用/配布用Tda/Haku.vmd"));
 
 	// VMD(カメラ)の読み込み
 	cameraPath = "motion/camera.vmd";
@@ -605,6 +612,8 @@ Dx12Wrapper::Dx12Wrapper(HWND hwnd)
 	InitShader();
 	InitLastShader();
 
+	primitiveManager.reset(new PrimitiveManager());
+	plane.reset(primitiveManager->CreatePlane(DirectX::XMFLOAT3(0, 0, 0), 100, 100));
 
 	cmdList->Close();
 
@@ -662,14 +671,14 @@ void Dx12Wrapper::Update()
 		{
 			pos.y = -0.05f;
 		}
-		if (keyState[VK_RIGHT] & 0x80)
+		/*if (keyState[VK_RIGHT] & 0x80)
 		{
 			pos.x = 0.05f;
 		}
 		if (keyState[VK_LEFT] & 0x80)
 		{
 			pos.x = -0.05f;
-		}
+		}*/
 		if (keyState['Z'] & 0x80)
 		{
 			pos.z = 0.05f;
@@ -697,15 +706,41 @@ void Dx12Wrapper::Update()
 			angle.y = -0.01f;
 		}
 	}
-
+	
+	//Dx12Constants::Instance().Update(vmdCamera->GetCameraData(), frame);
 	auto m = Dx12Constants::Instance().GetMappedMatrix();
 	m->world *= DirectX::XMMatrixTranslation(pos.x, pos.y, pos.z);
 	m->world *= DirectX::XMMatrixRotationY(angle.x);	// 回転
 	m->world *= DirectX::XMMatrixRotationX(angle.y);
 
+	//DirectX::XMFLOAT4 p(0, 1, 0, 0);	// 平面の方程式
+	//DirectX::XMFLOAT4 l(-1, 1, -1, 0);	// ライトの座標	
+	//m->world *= DirectX::XMMatrixShadow(DirectX::XMLoadFloat4(&p), DirectX::XMLoadFloat4(&l));
 
 	// 固定フレームにする
-	frame = ((GetTickCount64() - startTime) / 30) % maxFrame;
+	//frame = ((GetTickCount64() - startTime) / 30) % maxFrame;
+
+	// フレームを自分でいじる
+	if (keyState['P'] & 0x80)
+	{
+		frame = 0;
+	}
+	if (keyState[VK_RIGHT] & 0x80)
+	{
+		++frame;
+	}
+	if (keyState[VK_LEFT] & 0x80)
+	{
+		--frame;
+	}
+	if (frame > maxFrame)
+	{
+		frame = 0;
+	}
+	else if (frame < 0)
+	{
+		frame = maxFrame;
+	}
 
 	for (int i = 0; i < pmdManagers.size(); ++i)
 	{
@@ -737,6 +772,13 @@ void Dx12Wrapper::Draw()
 	{
 		pmd->Draw(cmdList);
 	}
+	// 床の描画
+	/*primitiveManager->SetPrimitiveDrawMode(cmdList);
+	auto rgstDescriptorHeap = Dx12Constants::Instance().GetRgstDescriptorHeap();
+	cmdList->SetDescriptorHeaps(1, &rgstDescriptorHeap);
+	cmdList->SetGraphicsRootDescriptorTable(0, rgstDescriptorHeap->GetGPUDescriptorHandleForHeapStart());*/
+
+	plane->Draw(cmdList);
 	// バリアのセット
 	SetBarrier();
 

@@ -27,13 +27,13 @@ struct VMDSkinData
 // カメラデータ
 struct VMDCameraData
 {
-	unsigned int frameNo;			// フレーム番号
-	float length;					// -(距離)
-	DirectX::XMFLOAT3 location;		// 位置
-	DirectX::XMFLOAT3 rotation;		// オイラー角 // X軸は符号が反転しているので注意 // 回転
-	char interpolation[24];			// おそらく[6][4](未検証) // 補完
-	unsigned int viewIngAngle;		// 視界角
-	char perspective;				// 0:on 1:off // パースペクティブ
+	unsigned int frameNo;		// フレーム番号
+	float length;				// -(距離)		// おそらくカメラ中心からの距離	※この値が0の場合はlocationがそのままカメラの座標になる
+	DirectX::XMFLOAT3 location;	// 位置			// カメラの注視点
+	DirectX::XMFLOAT3 rotation;	// オイラー角	// X軸は符号が反転しているので注意 // 回転
+	char interpolation[24];		// おそらく[6][4](未検証) // 補完
+	unsigned int viewIngAngle;	// 視界角
+	char perspective;			// 0:on 1:off	// パースペクティブ
 };
 
 // 照明データ

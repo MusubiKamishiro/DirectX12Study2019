@@ -62,7 +62,7 @@ struct PMDIKData
 // 表情用の頂点データ
 struct PMDSkinVertData
 {
-	unsigned int skinVertIndex;	// 表情用の頂点の番号(頂点リストにある番号)
+	unsigned int skinVertIndex;		// 表情用の頂点の番号(頂点リストにある番号)
 	DirectX::XMFLOAT3 skinVertPos;	// x, y, z // 表情用の頂点の座標(頂点自体の座標)
 };
 

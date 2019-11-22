@@ -16,6 +16,15 @@
     <Filter Include="シェーダ ファイル">
       <UniqueIdentifier>{d1bcb519-45b0-4d4f-bc2c-bce86366f234}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Primitive関係">
+      <UniqueIdentifier>{6432c1fe-6e53-4750-bcb2-b9e0d0894a3f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Primitive関係\ソース ファイル">
+      <UniqueIdentifier>{8bdfdba5-89f9-4e72-a0fd-723984d30278}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Primitive関係\ヘッダー ファイル">
+      <UniqueIdentifier>{56f49e18-45d7-4752-b959-f9895685086c}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -41,6 +50,15 @@
     </ClCompile>
     <ClCompile Include="VMDLoader.cpp">
       <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Plane.cpp">
+      <Filter>Primitive関係\ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Primitive.cpp">
+      <Filter>Primitive関係\ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="PrimitiveManager.cpp">
+      <Filter>Primitive関係\ソース ファイル</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -68,6 +86,15 @@
     <ClInclude Include="VMDLoader.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
+    <ClInclude Include="Plane.h">
+      <Filter>Primitive関係\ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="Primitive.h">
+      <Filter>Primitive関係\ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="PrimitiveManager.h">
+      <Filter>Primitive関係\ヘッダー ファイル</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="DirectX12Study2019.rc">
@@ -84,6 +111,9 @@
       <Filter>シェーダ ファイル</Filter>
     </FxCompile>
     <FxCompile Include="LastShader.hlsl">
+      <Filter>シェーダ ファイル</Filter>
+    </FxCompile>
+    <FxCompile Include="PrimitiveShader.hlsl">
       <Filter>シェーダ ファイル</Filter>
     </FxCompile>
   </ItemGroup>
