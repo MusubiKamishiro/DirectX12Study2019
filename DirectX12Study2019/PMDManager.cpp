@@ -863,3 +863,8 @@ void PMDManager::Draw(ID3D12GraphicsCommandList* cmdList)
 		offset += mat.faceVertCount;
 	}
 }
+
+ID3D12DescriptorHeap* PMDManager::GetBoneHeap()
+{
+	return boneHeap;
+}

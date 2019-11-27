@@ -116,5 +116,8 @@
     <FxCompile Include="PrimitiveShader.hlsl">
       <Filter>シェーダ ファイル</Filter>
     </FxCompile>
+    <FxCompile Include="LightShader.hlsl">
+      <Filter>シェーダ ファイル</Filter>
+    </FxCompile>
   </ItemGroup>
 </Project>

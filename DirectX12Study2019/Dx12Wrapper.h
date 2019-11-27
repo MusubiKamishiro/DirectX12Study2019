@@ -12,7 +12,7 @@ class PMDManager;
 class VMDLoader;
 class PrimitiveManager;
 class Plane;
-
+class ImageManager;
 
 struct Vector3
 {
@@ -32,6 +32,8 @@ struct Vertex
 class Dx12Wrapper
 {
 private:
+	std::shared_ptr<ImageManager> imageManager;
+
 	IDXGISwapChain4* swapChain = nullptr;	// スワップチェイン
 	// コマンド系
 	ID3D12CommandAllocator* cmdAllocator = nullptr;	// コマンドアロケータ
@@ -82,6 +84,25 @@ private:
 	// 待ち
 	void WaitExecute();
 
+	// 影用バッファの作成
+	void CreateShadowBuff();
+	ID3D12Resource* shadowBuff = nullptr;
+	ID3D12DescriptorHeap* shadowDsvHeap;
+	ID3D12DescriptorHeap* shadowSrvHeap;
+	D3D12_VIEWPORT shadowViewport;	// 影用ビューポート
+	D3D12_RECT shadowScissorRect;	// 影用シザーレクト
+	// 影用シェーダー
+	void InitShadowShader();
+	// 影用ルートシグネチャの初期化
+	void InitShadowRootSignature();
+	ID3D12RootSignature* shadowRootSignature;
+	// 影用パイプラインステートの初期化
+	void InitShadowPipelineState();
+	ID3D12PipelineState* shadowPipelineState;
+	ID3DBlob* shadowVertexShader = nullptr;	// 頂点シェーダ
+	ID3DBlob* shadowPixelShader = nullptr;	// ピクセルシェーダ
+	// ライトからの撮影
+	void CreateLightView();
 
 	// 1パス目の作成
 	void CreateFirstPassBuff();
@@ -107,6 +128,10 @@ private:
 	void InitLastShader();
 	ID3DBlob* lastVertexShader = nullptr;	// 頂点シェーダ
 	ID3DBlob* lastPixelShader = nullptr;	// ピクセルシェーダ
+
+	// 確認用
+	D3D12_VIEWPORT checkViewport;	// 確認用ビューポート
+	D3D12_RECT checkScissorRect;	// 確認用シザーレクト
 
 	
 	ID3D12DescriptorHeap* rtvDescriptorHeap = nullptr;	// レンダーターゲットビュー用のヒープ
@@ -139,6 +164,8 @@ private:
 	// 床
 	std::shared_ptr<PrimitiveManager> primitiveManager;
 	std::shared_ptr<Plane> plane;
+	ID3D12Resource* floorImgBuff = nullptr;
+	ID3D12DescriptorHeap* floorImgHeap = nullptr;
 	
 public:
 	Dx12Wrapper(HWND hwnd);

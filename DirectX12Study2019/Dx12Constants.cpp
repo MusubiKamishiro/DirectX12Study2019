@@ -24,14 +24,12 @@ Dx12Constants::Dx12Constants()
 	mappedMatrix.world = world;
 
 	// カメラの設定
-	auto eyePos = DirectX::XMFLOAT3(0, 20, -60);	// カメラの位置(視点)
+	auto eyePos = DirectX::XMFLOAT3(0, 20, -30);	// カメラの位置(視点)
 	auto focusPos = DirectX::XMFLOAT3(0, 10, 0);	// 焦点の位置(注視点)
 	auto up = DirectX::XMFLOAT3(0.0f, 1.0f, 0.0f);	// カメラの上方向(通常は(0.0f, 1.0f, 0.0f))	// カメラを固定するためのもの
 
-	//DirectX::XMMATRIX camera = DirectX::XMMatrixLookAtLH(XMLoadFloat3(&eyePos), XMLoadFloat3(&focusPos), XMLoadFloat3(&up));	// カメラ行列
-													// XMLoadFloat3...XMFloat3をXMVECTORに変換する
 	// DirectX::XMMatrixLookAtLHの中身
-	DirectX::XMVECTOR EyeDirection = DirectX::XMVectorSubtract(XMLoadFloat3(&focusPos), XMLoadFloat3(&eyePos));
+	/*DirectX::XMVECTOR EyeDirection = DirectX::XMVectorSubtract(XMLoadFloat3(&focusPos), XMLoadFloat3(&eyePos));
 
 	DirectX::XMVECTOR R2 = DirectX::XMVector3Normalize(EyeDirection);
 
@@ -52,13 +50,13 @@ Dx12Constants::Dx12Constants()
 	M.r[2] = DirectX::XMVectorSelect(D2, R2, g_XMSelect1110.v);
 	M.r[3] = g_XMIdentityR3.v;
 
-	M = XMMatrixTranspose(M);
+	M = XMMatrixTranspose(M);*/
 	// ここまで中身
-	DirectX::XMMATRIX camera = M;
-
+	//DirectX::XMMATRIX camera = M;
+	DirectX::XMMATRIX camera = DirectX::XMMatrixLookAtLH(XMLoadFloat3(&eyePos), XMLoadFloat3(&focusPos), XMLoadFloat3(&up));	// カメラ行列
+													// XMLoadFloat3...XMFloat3をXMVECTORに変換する
 
 	auto aspect = (float)wsize.width / (float)wsize.height;		// ビュー空間の高さと幅のアスペクト比
-																		// 視野角(現在90度)
 	DirectX::XMMATRIX projection = DirectX::XMMatrixPerspectiveFovLH(3.1415f / 2.0f, aspect, 0.5f, 300.0f);		// 射影行列	// LH...LeftHandの略,RHもあるよ
 	DirectX::XMMATRIX lightProj = DirectX::XMMatrixOrthographicLH(30, 30, 0.5f, 300.0f);
 
@@ -66,19 +64,14 @@ Dx12Constants::Dx12Constants()
 	mappedMatrix.wvp = world * camera * projection;
 
 	auto lightPos = DirectX::XMFLOAT3(50, 70, -15);
-	DirectX::XMMATRIX _lcamera = DirectX::XMMatrixLookAtLH(XMLoadFloat3(&lightPos), XMLoadFloat3(&focusPos), XMLoadFloat3(&up));
-	mappedMatrix.lightVP = _lcamera * lightProj;
+	DirectX::XMMATRIX lcamera = DirectX::XMMatrixLookAtLH(XMLoadFloat3(&lightPos), XMLoadFloat3(&focusPos), XMLoadFloat3(&up));
+	mappedMatrix.lightVP = lcamera * lightProj;
 
 	size_t size = sizeof(mappedMatrix);
 	size = (size + 0xff) & ~0xff;		// 256アライメントに合わせている
 
-	result = dev->CreateCommittedResource(
-		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
-		D3D12_HEAP_FLAGS::D3D12_HEAP_FLAG_NONE,
-		&CD3DX12_RESOURCE_DESC::Buffer(size),
-		D3D12_RESOURCE_STATE_GENERIC_READ,
-		nullptr,
-		IID_PPV_ARGS(&constBuff));
+	result = dev->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD), D3D12_HEAP_FLAGS::D3D12_HEAP_FLAG_NONE,
+		&CD3DX12_RESOURCE_DESC::Buffer(size), D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&constBuff));
 
 	result = constBuff->Map(0, nullptr, (void**)& m);	// シェーダに送る
 	*m = mappedMatrix;
@@ -118,6 +111,7 @@ void Dx12Constants::CameraMove(const VMDCameraData& cameraData, const VMDCameraD
 
 	auto wsize = Application::Instance().GetWindowSize();	// 画面サイズ
 	auto aspect = (float)wsize.width / (float)wsize.height;	// ビュー空間の高さと幅のアスペクト比
+																		// 視野角
 	DirectX::XMMATRIX projection = DirectX::XMMatrixPerspectiveFovLH((3.1415f / 180.0f) * cameraData.viewIngAngle, aspect, 0.5f, 300.0f);		// 射影行列	// LH...LeftHandの略,RHもあるよ
 
 	DirectX::XMMATRIX world = DirectX::XMMatrixIdentity();
@@ -166,7 +160,6 @@ void Dx12Constants::Update(const std::vector<VMDCameraData>& cameraData, const i
 		float b = (float)nextFrameIt->frameNo;
 		float t = (static_cast<float>(frame - a)) / (b - a);	// 補間
 		
-		//RotateBone(frameIt->quaternion, nextFrameIt->quaternion, t);
 		CameraMove(*frameIt, *nextFrameIt, t);
 	}
 

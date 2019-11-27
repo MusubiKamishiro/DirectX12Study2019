@@ -124,7 +124,7 @@ void PrimitiveManager::InitPrimitivePipelineState()
 	gpsDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;		// このターゲット数と設定するフォーマット数は
 	gpsDesc.NumRenderTargets = 1;							// 一致させておく
 	// 深度ステンシル
-	gpsDesc.DepthStencilState.DepthEnable = false;
+	gpsDesc.DepthStencilState.DepthEnable = true;
 	gpsDesc.DepthStencilState.StencilEnable = false;
 	gpsDesc.DSVFormat = DXGI_FORMAT_D32_FLOAT;
 	gpsDesc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;

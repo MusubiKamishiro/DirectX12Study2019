@@ -16,7 +16,6 @@ cbuffer mat : register(b0)
 	matrix wvp;			// 合成済み
 	matrix lightVP;		// ライトビュープロジェクション
 };
-
 // 定数バッファ(1番)
 cbuffer material : register(b1)
 {
@@ -24,7 +23,6 @@ cbuffer material : register(b1)
 	float3 specular;	// スペキュラカラー(光沢色)
 	float3 mirror;		// アンビエントカラー(環境色)
 };
-
 // ボーン行列(2番)
 cbuffer bones : register(b2)
 {

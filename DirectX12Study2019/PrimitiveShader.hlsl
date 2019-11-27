@@ -38,8 +38,6 @@ Output vs(float4 pos : POSITION, float4 normal : NORMAL, float2 uv : TEXCOORD)
 // ﾋﾟｸｾﾙｼｪｰﾀﾞ
 float4 ps(Output output) : SV_TARGET
 {
-	return float4(1, 0, 0, 1);
-
 	float ld = output.shadowPos.z;	// ライトビュー変換後のz座標
 	float2 uv = ((float2(1, -1) + output.shadowPos.xy) * float2(0.5, -0.5));
 
@@ -47,21 +45,22 @@ float4 ps(Output output) : SV_TARGET
 	tex.GetDimensions(width, height);	// textureのサイズをとってくる
 
 	float4 ret = tex.Sample(smp, output.uv);
-	ret *= 4;
+	//ret *= 4;
 
-	ret -= tex.Sample(smp, output.uv, int2(0, -2));
-	ret -= tex.Sample(smp, output.uv, int2(0, 2));
-	ret -= tex.Sample(smp, output.uv, int2(2, 0));
-	ret -= tex.Sample(smp, output.uv, int2(-2, 0));
+	//ret -= tex.Sample(smp, output.uv, int2(0, -2));
+	//ret -= tex.Sample(smp, output.uv, int2(0, 2));
+	//ret -= tex.Sample(smp, output.uv, int2(2, 0));
+	//ret -= tex.Sample(smp, output.uv, int2(-2, 0));
 
-	float3 reverse = 1 - ret.rgb;
+	//float3 reverse = 1 - ret.rgb;
 
 	if (ld > shadow.Sample(smp, uv))
 	{
-		return float4(0.0f, 0.0f, 0.0f, 1.0f);
+		return float4(1.0f, 0.0f, 0.0f, 1.0f);
 	}
 
-	return float4(reverse, 1.0f);
+	return float4(0, 1, 0, 1);
+	//return float4(reverse, 1.0f);
 	return float4(ret);
 	return float4(tex.Sample(smp, output.uv).rgb, 1.0f);
 }
