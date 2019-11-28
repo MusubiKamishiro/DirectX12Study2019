@@ -20,7 +20,7 @@ struct Output {
 	float4 pos		: POSITION;
 	float4 normal	: NORMAL;
 	float2 uv		: TEXCOORD;
-	float4 shadowPos	: SHADOW_POS;
+	float4 shadowPos: SHADOW_POS;
 };
 
 // ’¸“_¼ª°ÀÞ

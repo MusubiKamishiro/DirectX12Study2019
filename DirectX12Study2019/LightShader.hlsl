@@ -14,8 +14,8 @@ cbuffer bones : register(b1)
 {
 	matrix boneMats[512];
 }
-
-Texture2D<float> shadow : register(t0);	// ‰e
+// ‰e
+Texture2D<float> shadow : register(t0);
 
 
 struct Output {
@@ -45,5 +45,9 @@ Output vs(float4 pos : POSITION, float4 normal : NORMAL, float2 uv : TEXCOORD, m
 
 float4 ps(Output output) : SV_TARGET
 {
-	return float4(0.0f, 1.0f, 0.0f, 1.0f);
+	float depth = shadow.Sample(smp, output.uv);
+	depth = pow(depth, 50);
+
+	//return float4(depth, depth, depth, 1.0f);
+	return float4(0.0f, 0.0f, 1.0f, 1.0f);
 }

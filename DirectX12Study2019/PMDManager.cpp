@@ -299,7 +299,7 @@ void PMDManager::CreateModelTexture()
 
 void PMDManager::CreateWhiteTexture()
 {
-	whiteTexBuff = CreateTextureResource(whiteTexBuff);
+	whiteTexBuff = imageManager->CreateTextureResource(whiteTexBuff);
 
 	std::vector<unsigned char> data(4 * 4 * 4);
 	std::fill(data.begin(), data.end(), 0xff);	// ”’
@@ -309,7 +309,7 @@ void PMDManager::CreateWhiteTexture()
 
 void PMDManager::CreateBlackTexture()
 {
-	blackTexBuff = CreateTextureResource(blackTexBuff);
+	blackTexBuff = imageManager->CreateTextureResource(blackTexBuff);
 
 	std::vector<unsigned char> data(4 * 4 * 4);
 	std::fill(data.begin(), data.end(), 0x00);	// •
@@ -319,7 +319,7 @@ void PMDManager::CreateBlackTexture()
 
 void PMDManager::CreateGraduationTextureBuffer()
 {
-	gradTexBuff = CreateTextureResource(gradTexBuff);
+	gradTexBuff = imageManager->CreateTextureResource(gradTexBuff);
 
 	struct Color
 	{
@@ -604,43 +604,6 @@ std::wstring PMDManager::GetWideStringFromString(std::string& str)
 		str.c_str(), -1, &wstr[0], bsize);
 
 	return wstr;
-}
-
-ID3D12Resource* PMDManager::CreateTextureResource(ID3D12Resource* buff, const unsigned int width, const unsigned int height, const unsigned int arraySize)
-{
-	D3D12_HEAP_PROPERTIES heapprop = {};
-	heapprop.Type = D3D12_HEAP_TYPE_CUSTOM;
-	heapprop.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_WRITE_BACK;
-	heapprop.MemoryPoolPreference = D3D12_MEMORY_POOL_L0;
-	heapprop.CreationNodeMask = 1;
-	heapprop.VisibleNodeMask = 1;
-
-	D3D12_RESOURCE_DESC resDesc = {};
-	resDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-	resDesc.Alignment = 0;
-	resDesc.Width = width;
-	resDesc.Height = height;
-	resDesc.DepthOrArraySize = arraySize;
-	resDesc.MipLevels = 0;
-	resDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-	resDesc.SampleDesc.Count = 1;
-	resDesc.SampleDesc.Quality = 0;
-	resDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
-	resDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
-
-	auto result = Dx12Device::Instance().GetDevice()->CreateCommittedResource(
-		&heapprop,
-		D3D12_HEAP_FLAG_NONE,
-		&resDesc,
-		D3D12_RESOURCE_STATE_COPY_DEST,
-		nullptr,
-		IID_PPV_ARGS(&buff));
-
-	if (result == S_OK)
-	{
-		return buff;
-	}
-	return nullptr;
 }
 
 std::string PMDManager::GetToonPathFromIndex(const std::string& folder, int idx)

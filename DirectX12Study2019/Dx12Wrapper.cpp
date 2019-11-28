@@ -2,6 +2,8 @@
 #include <d3dcompiler.h>
 #include <DirectXTex.h>
 #include "d3dx12.h"
+#include <Effekseer.h>
+#include <EffekseerRendererDX12.h>
 
 #include "Application.h"
 #include "Dx12Device.h"
@@ -17,7 +19,10 @@
 #pragma comment(lib, "dxgi.lib")
 #pragma comment(lib, "d3dcompiler.lib")
 #pragma comment(lib, "DirectXTex.lib")
-//#pragma comment(lib, "winmm.lib")
+#pragma comment(lib, "winmm.lib")
+#pragma comment(lib, "Effekseer.lib")
+#pragma comment(lib, "EffekseerRendererDX12.lib")
+#pragma comment(lib, "LLGI.lib")
 
 
 void Dx12Wrapper::CreateDebugLayer()
@@ -775,9 +780,9 @@ Dx12Wrapper::Dx12Wrapper(HWND hwnd)
 	//modelPath = "model/vocaloid/初音ミクmetal.pmd";
 	//modelPath = "model/vocaloid/巡音ルカ.pmd";
 	//modelPath = "model/hibiki/我那覇響v1.pmd";
-	pmdManagers.emplace_back(new PMDManager("model/vocaloid/初音ミク.pmd"));
 	//pmdManagers.emplace_back(new PMDManager("model/hibiki/我那覇響v1_グラビアミズギ.pmd"));
 	//pmdManagers.emplace_back(new PMDManager("model/yayoi/やよいヘッド_カジュアル（体x0.96）改造.pmd"));
+	pmdManagers.emplace_back(new PMDManager("model/vocaloid/初音ミク.pmd"));
 	pmdManagers.emplace_back(new PMDManager("model/vocaloid/初音ミク.pmd"));
 	pmdManagers.emplace_back(new PMDManager("model/vocaloid/初音ミク.pmd"));
 	pmdManagers.emplace_back(new PMDManager("model/vocaloid/初音ミク.pmd"));
@@ -806,6 +811,7 @@ Dx12Wrapper::Dx12Wrapper(HWND hwnd)
 	// 床
 	primitiveManager.reset(new PrimitiveManager());
 	plane.reset(primitiveManager->CreatePlane(DirectX::XMFLOAT3(0, 0, 0), 200, 200));
+	// 床に張る画像
 	imageManager.reset(new ImageManager());
 	floorImgBuff = imageManager->Load("img/masaki.png");
 	// ヒープの設定
@@ -814,10 +820,8 @@ Dx12Wrapper::Dx12Wrapper(HWND hwnd)
 	descHeapDesc.NodeMask = 0;
 	descHeapDesc.NumDescriptors = 1;
 	descHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-
 	// ヒープ作成
 	result = dev->CreateDescriptorHeap(&descHeapDesc, IID_PPV_ARGS(&floorImgHeap));
-
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
 	srvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
 	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
@@ -850,6 +854,13 @@ Dx12Wrapper::Dx12Wrapper(HWND hwnd)
 	checkScissorRect.top = 0;
 	checkScissorRect.right = wsize.width;
 	checkScissorRect.bottom = wsize.height;
+
+
+
+	// Effekseerテスト
+	auto a = DXGI_FORMAT_R8G8B8A8_UNORM;
+	auto r = EffekseerRendererDX12::Create(dev, cmdQueue, 2, &a, 1, true, false, 2000);
+	r->Release();
 }
 
 Dx12Wrapper::~Dx12Wrapper()
@@ -871,8 +882,6 @@ Dx12Wrapper::~Dx12Wrapper()
 	lastPipelineState->Release();
 	lastRootSignature->Release();
 
-	//vertexBuffer->Release();
-	//indexBuffer->Release();
 	screenVertexBuffer->Release();
 	for (auto& backBuffer : backBuffers)
 	{
@@ -951,7 +960,7 @@ void Dx12Wrapper::Update()
 	//m->world *= DirectX::XMMatrixShadow(DirectX::XMLoadFloat4(&p), DirectX::XMLoadFloat4(&l));
 
 	// 固定フレームにする
-	//frame = ((GetTickCount64() - startTime) / 30) % maxFrame;
+	frame = ((GetTickCount64() - startTime) / 30) % maxFrame;
 
 	// フレームを自分でいじる
 	if (keyState['P'] & 0x80)
@@ -999,6 +1008,10 @@ void Dx12Wrapper::Draw()
 	//UnlockBarrier(shadowBuff);
 	cmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(shadowBuff,
 		D3D12_RESOURCE_STATE_DEPTH_READ, D3D12_RESOURCE_STATE_DEPTH_WRITE));
+
+	cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	cmdList->IASetVertexBuffers(0, 1, &vbView);
+	cmdList->IASetIndexBuffer(&ibView);
 
 	for (auto& pmd : pmdManagers)
 	{

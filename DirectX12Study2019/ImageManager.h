@@ -21,14 +21,15 @@ private:
 	//@return 変換されたワイド文字列
 	std::wstring GetWideStringFromString(const std::string& str);
 
-	// テクスチャリソースの作成
-	ID3D12Resource* CreateTextureResource(ID3D12Resource* buff, const unsigned int width = 4,
-		const unsigned int height = 4, const unsigned int arraySize = 1);
-
 public:
 	ImageManager();
 	~ImageManager();
 
+	// テクスチャリソースの作成
+	ID3D12Resource* CreateTextureResource(ID3D12Resource* buff, const unsigned int width = 4,
+		const unsigned int height = 4, const unsigned int arraySize = 1);
+
+	// 画像の読み込み
 	ID3D12Resource* Load(const std::string& filepath);
 };
 
