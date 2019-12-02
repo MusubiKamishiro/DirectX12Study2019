@@ -2,6 +2,8 @@
 #include <d3d12.h>
 #include <dxgi1_6.h>
 #include <DirectXMath.h>
+#include <Effekseer.h>
+#include <EffekseerRendererDX12.h>
 
 #include <vector>
 #include <array>
@@ -129,10 +131,6 @@ private:
 	ID3DBlob* lastVertexShader = nullptr;	// 頂点シェーダ
 	ID3DBlob* lastPixelShader = nullptr;	// ピクセルシェーダ
 
-	// 確認用
-	D3D12_VIEWPORT checkViewport;	// 確認用ビューポート
-	D3D12_RECT checkScissorRect;	// 確認用シザーレクト
-
 	
 	ID3D12DescriptorHeap* rtvDescriptorHeap = nullptr;	// レンダーターゲットビュー用のヒープ
 	std::vector<ID3D12Resource*> backBuffers;
@@ -166,6 +164,15 @@ private:
 	std::shared_ptr<Plane> plane;
 	ID3D12Resource* floorImgBuff = nullptr;
 	ID3D12DescriptorHeap* floorImgHeap = nullptr;
+
+	// Effekseerテスト
+	void EffekseerInit();
+	EffekseerRenderer::Renderer* efkRenderer;					// レンダラー
+	Effekseer::Manager* efkManager;								// マネージャー
+	EffekseerRenderer::SingleFrameMemoryPool* efkMemoryPool;	// メモリプール
+	EffekseerRenderer::CommandList* efkCmdList;					// コマンドリスト
+	Effekseer::Effect* effect;		// エフェクト
+	Effekseer::Handle efkHandle;
 	
 public:
 	Dx12Wrapper(HWND hwnd);

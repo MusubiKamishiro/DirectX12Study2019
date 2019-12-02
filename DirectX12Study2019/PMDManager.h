@@ -198,7 +198,6 @@ public:
 
 	void Update(const std::map<std::string, std::vector<BoneKeyFrames>>& animationdata, const std::map<std::string, std::vector<SkinKeyFrames>>& skindata, const int& nowframe);
 	void Draw(ID3D12GraphicsCommandList* cmdList);
-
-	ID3D12DescriptorHeap* GetBoneHeap();
+	void ShadowDraw(ID3D12GraphicsCommandList* cmdList);
 };
 

@@ -2,8 +2,7 @@
 #include <d3dcompiler.h>
 #include <DirectXTex.h>
 #include "d3dx12.h"
-#include <Effekseer.h>
-#include <EffekseerRendererDX12.h>
+
 
 #include "Application.h"
 #include "Dx12Device.h"
@@ -760,6 +759,49 @@ void Dx12Wrapper::InitLastShader()
 	InitLastPipelineState();
 }
 
+void Dx12Wrapper::EffekseerInit()
+{
+	auto dev = Dx12Device::Instance().GetDevice();
+	// Effekseerテスト
+	auto format = DXGI_FORMAT_R8G8B8A8_UNORM;
+	efkRenderer = EffekseerRendererDX12::Create(dev, cmdQueue, 2, &format, 1, false, false, 2000);	// デバイス, コマンドキュー, バックバッファ数, バックバッファのフォーマット, レンダーターゲット数, 深度値有効フラグ, 反転デプスフラグ, 最大パーティクル数
+	efkManager = Effekseer::Manager::Create(2000);
+
+	// 描画用インスタンスから描画機能を設定
+	efkManager->SetSpriteRenderer(efkRenderer->CreateSpriteRenderer());
+	efkManager->SetRibbonRenderer(efkRenderer->CreateRibbonRenderer());
+	efkManager->SetTrackRenderer(efkRenderer->CreateTrackRenderer());
+	efkManager->SetModelRenderer(efkRenderer->CreateModelRenderer());
+
+	// 描画用インスタンスからテクスチャの読込機能を設定
+	// 独自拡張機能、現在はファイルからの読込
+	efkManager->SetTextureLoader(efkRenderer->CreateTextureLoader());
+	efkManager->SetModelLoader(efkRenderer->CreateModelLoader());
+
+	// エフェクト発生位置を設定
+	auto efkPos = Effekseer::Vector3D(0.0f, 0.0f, 0.0f);
+
+	// メモリプール
+	efkMemoryPool = EffekseerRendererDX12::CreateSingleFrameMemoryPool(efkRenderer);
+	// コマンドリスト作成
+	efkCmdList = EffekseerRendererDX12::CreateCommandList(efkRenderer, efkMemoryPool);
+	// コマンドリストセット
+	efkRenderer->SetCommandList(efkCmdList);
+
+	// 投影行列を設定
+	auto wsize = Application::Instance().GetWindowSize();	// 画面サイズ
+	auto aspect = (float)wsize.width / (float)wsize.height;	// ビュー空間の高さと幅のアスペクト比
+	efkRenderer->SetProjectionMatrix(Effekseer::Matrix44().PerspectiveFovLH(90.f / 180.0f * 3.14f, aspect, 1.0f, 100.0f));
+
+	// カメラ行列を設定
+	efkRenderer->SetCameraMatrix(Effekseer::Matrix44().LookAtLH(Effekseer::Vector3D(0.0f, 10.0f, -25.0f), Effekseer::Vector3D(0.0f, 15.0f, 0.0f), Effekseer::Vector3D(0.0f, 1.0f, 0.0f)));
+
+	// エフェクトの読込
+	effect = Effekseer::Effect::Create(efkManager, (const EFK_CHAR*)L"effect/test.efk");
+	//effect = Effekseer::Effect::Create(efkManager, (const EFK_CHAR*)L"effect/blood/BloodLance.efk");
+
+}
+
 Dx12Wrapper::Dx12Wrapper(HWND hwnd)
 {
 #ifdef _DEBUG
@@ -777,7 +819,6 @@ Dx12Wrapper::Dx12Wrapper(HWND hwnd)
 	result = dev->CreateFence(fenceValue, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence));
 	
 	// PMDモデルの読み込み
-	//modelPath = "model/vocaloid/初音ミクmetal.pmd";
 	//modelPath = "model/vocaloid/巡音ルカ.pmd";
 	//modelPath = "model/hibiki/我那覇響v1.pmd";
 	//pmdManagers.emplace_back(new PMDManager("model/hibiki/我那覇響v1_グラビアミズギ.pmd"));
@@ -842,25 +883,7 @@ Dx12Wrapper::Dx12Wrapper(HWND hwnd)
 	startTime = GetTickCount64();
 	maxFrame = vmdLoaders[0]->GetMaxFrame();
 
-	auto wsize = Application::Instance().GetWindowSize();
-	checkViewport.TopLeftX = 0;
-	checkViewport.TopLeftY = 0;
-	checkViewport.Width = wsize.width / 4;
-	checkViewport.Height = wsize.height / 4;
-	checkViewport.MaxDepth = 1.0f;
-	checkViewport.MinDepth = 0.0f;
-
-	checkScissorRect.left = 0;
-	checkScissorRect.top = 0;
-	checkScissorRect.right = wsize.width;
-	checkScissorRect.bottom = wsize.height;
-
-
-
-	// Effekseerテスト
-	auto a = DXGI_FORMAT_R8G8B8A8_UNORM;
-	auto r = EffekseerRendererDX12::Create(dev, cmdQueue, 2, &a, 1, true, false, 2000);
-	r->Release();
+	EffekseerInit();
 }
 
 Dx12Wrapper::~Dx12Wrapper()
@@ -900,6 +923,13 @@ Dx12Wrapper::~Dx12Wrapper()
 	shadowPixelShader->Release();
 
 	floorImgHeap->Release();
+
+	efkRenderer->Release();
+	efkManager->Release();
+	efkMemoryPool->Release();
+	efkCmdList->Release();
+	effect->UnloadResources();
+	effect->Release();
 }
 
 void Dx12Wrapper::Update()
@@ -988,6 +1018,16 @@ void Dx12Wrapper::Update()
 	{
 		pmdManagers[i]->Update(vmdLoaders[i]->GetAnimationData(), vmdLoaders[i]->GetSkinData(), frame);
 	}
+
+	// Effekseer
+	if (keyState[VK_SPACE] & 0x80)
+	{
+		if (efkManager->Exists(efkHandle))
+		{
+			efkManager->StopEffect(efkHandle);
+		}
+		efkHandle = efkManager->Play(effect, Effekseer::Vector3D(0, 0, 0));
+	}
 }
 
 void Dx12Wrapper::Draw()
@@ -1009,13 +1049,9 @@ void Dx12Wrapper::Draw()
 	cmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(shadowBuff,
 		D3D12_RESOURCE_STATE_DEPTH_READ, D3D12_RESOURCE_STATE_DEPTH_WRITE));
 
-	cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	cmdList->IASetVertexBuffers(0, 1, &vbView);
-	cmdList->IASetIndexBuffer(&ibView);
-
 	for (auto& pmd : pmdManagers)
 	{
-		pmd->Draw(cmdList);
+		pmd->ShadowDraw(cmdList);
 	}
 
 	// バリアを張る
@@ -1060,6 +1096,15 @@ void Dx12Wrapper::Draw()
 	cmdList->SetDescriptorHeaps(1, &floorImgHeap);
 	cmdList->SetGraphicsRootDescriptorTable(2, floorImgHeap->GetGPUDescriptorHandleForHeapStart());
 	plane->Draw(cmdList);
+
+	// エフェクト描画
+	efkManager->Update();
+	efkMemoryPool->NewFrame();
+	EffekseerRendererDX12::BeginCommandList(efkCmdList, cmdList);
+	efkRenderer->BeginRendering();
+	efkManager->Draw();
+	efkRenderer->EndRendering();
+	EffekseerRendererDX12::EndCommandList(efkCmdList);
 	
 	// バリアのセット
 	SetBarrier();
@@ -1095,15 +1140,12 @@ void Dx12Wrapper::Draw()
 	// ペラポリ描画
 	cmdList->DrawInstanced(4, 1, 0, 0);
 
-	// 深度確認
-	cmdList->RSSetViewports(1, &checkViewport);
-	cmdList->RSSetScissorRects(1, &checkScissorRect);
-	cmdList->SetDescriptorHeaps(1, &shadowSrvHeap);
-	cmdList->SetGraphicsRootDescriptorTable(0, shadowSrvHeap->GetGPUDescriptorHandleForHeapStart());
-	cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
-	cmdList->IASetVertexBuffers(0, 1, &svbView);
-	// ペラポリ描画
-	cmdList->DrawInstanced(4, 1, 0, 0);
+
+	//////
+	//cmdList->SetDescriptorHeaps(1, &shadowSrvHeap);
+	//cmdList->SetGraphicsRootDescriptorTable(0, shadowSrvHeap->GetGPUDescriptorHandleForHeapStart());
+	//cmdList->DrawInstanced(3, 1, 0, 0);
+	//////
 
 	// バリアのセット
 	SetBarrier();

@@ -827,7 +827,25 @@ void PMDManager::Draw(ID3D12GraphicsCommandList* cmdList)
 	}
 }
 
-ID3D12DescriptorHeap* PMDManager::GetBoneHeap()
+void PMDManager::ShadowDraw(ID3D12GraphicsCommandList* cmdList)
 {
-	return boneHeap;
+	auto rgstDescriptorHeap = Dx12Constants::Instance().GetRgstDescriptorHeap();
+	cmdList->SetDescriptorHeaps(1, &rgstDescriptorHeap);
+	auto rgstHeapHandle = rgstDescriptorHeap->GetGPUDescriptorHandleForHeapStart();
+	cmdList->SetGraphicsRootDescriptorTable(0, rgstHeapHandle);
+
+	cmdList->SetDescriptorHeaps(1, &boneHeap);
+	cmdList->SetGraphicsRootDescriptorTable(1, boneHeap->GetGPUDescriptorHandleForHeapStart());
+
+	cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	cmdList->IASetVertexBuffers(0, 1, &vbView);
+	cmdList->IASetIndexBuffer(&ibView);
+
+	unsigned int offset = 0;
+	for (auto m : matDatas)
+	{
+		// •`‰æ
+		cmdList->DrawIndexedInstanced(m.faceVertCount, 1, offset, 0, 0);
+		offset += m.faceVertCount;
+	}
 }

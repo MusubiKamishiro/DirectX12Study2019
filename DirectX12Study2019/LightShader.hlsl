@@ -18,7 +18,8 @@ cbuffer bones : register(b1)
 Texture2D<float> shadow : register(t0);
 
 
-struct Output {
+struct Output
+{
 	float4 svpos	: SV_POSITION;		// VPæZÏ‚İ
 	float4 pos		: POSITION;
 	float4 normal	: NORMAL;

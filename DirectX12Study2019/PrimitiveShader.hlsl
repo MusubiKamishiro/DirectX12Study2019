@@ -15,7 +15,8 @@ Texture2D<float> shadow	: register(t0);
 Texture2D<float4> tex	: register(t1);
 
 
-struct Output {
+struct Output 
+{
 	float4 svpos	: SV_POSITION;		// VPæZÏ‚İ
 	float4 pos		: POSITION;
 	float4 normal	: NORMAL;
@@ -56,7 +57,7 @@ float4 ps(Output output) : SV_TARGET
 
 	if (ld > shadow.Sample(smp, uv))
 	{
-		return float4(1.0f, 0.0f, 0.0f, 1.0f);
+		return float4(0.0f, 0.0f, 0.0f, 1.0f);
 	}
 
 	return float4(0, 1, 0, 1);
