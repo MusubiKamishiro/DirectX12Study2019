@@ -58,7 +58,7 @@ Dx12Constants::Dx12Constants()
 
 	auto aspect = (float)wsize.width / (float)wsize.height;		// ビュー空間の高さと幅のアスペクト比
 	DirectX::XMMATRIX projection = DirectX::XMMatrixPerspectiveFovLH(3.1415f / 2.0f, aspect, 0.5f, 300.0f);		// 射影行列	// LH...LeftHandの略,RHもあるよ
-	DirectX::XMMATRIX lightProj = DirectX::XMMatrixOrthographicLH(30, 30, 0.5f, 300.0f);
+	DirectX::XMMATRIX lightProj = DirectX::XMMatrixOrthographicLH(100, 100, 0.5f, 300.0f);
 
 	mappedMatrix.viewProj = camera * projection;	// かける順番には気を付けよう
 	mappedMatrix.wvp = world * camera * projection;

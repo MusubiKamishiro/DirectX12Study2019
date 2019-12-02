@@ -3,7 +3,6 @@
 #include <DirectXTex.h>
 #include "d3dx12.h"
 
-
 #include "Application.h"
 #include "Dx12Device.h"
 #include "Dx12Constants.h"
@@ -91,56 +90,6 @@ void Dx12Wrapper::CreateRenderTarget()
 		dev->CreateRenderTargetView(backBuffers[i], nullptr, cpuDescH);		// キャンバスと職人を紐づける
 		cpuDescH.ptr += rtvSize;	// レンダーターゲットビューのサイズぶんずらす
 	}
-}
-
-void Dx12Wrapper::CreateVertexBuffer()
-{
-	std::vector<Vertex> vertices;
-	vertices.emplace_back(DirectX::XMFLOAT3(-0.8f, -0.8f, 0.0f), DirectX::XMFLOAT2(0.0f, 1.0f));	// 左下
-	vertices.emplace_back(DirectX::XMFLOAT3(-0.8f, 0.8f, 0.0f), DirectX::XMFLOAT2(0.0f, 0.0f));		// 左上
-	vertices.emplace_back(DirectX::XMFLOAT3(0.8f, -0.8f, 0.0f), DirectX::XMFLOAT2(1.0f, 1.0f));		// 右上
-	vertices.emplace_back(DirectX::XMFLOAT3(0.8f, 0.8f, 0.0f), DirectX::XMFLOAT2(1.0f, 0.0f));		// 右下
-
-	D3D12_HEAP_PROPERTIES heapprop = {};
-	heapprop.Type = D3D12_HEAP_TYPE_UPLOAD;
-	heapprop.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-	heapprop.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-
-	D3D12_RESOURCE_DESC resdesc = {};
-	resdesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-	resdesc.Width = vertices.size();	// 頂点情報が入るだけのサイズ
-	resdesc.Height = 1;
-	resdesc.DepthOrArraySize = 1;
-	resdesc.MipLevels = 1;
-	resdesc.Format = DXGI_FORMAT_UNKNOWN;
-	resdesc.SampleDesc.Count = 1;
-	resdesc.Flags = D3D12_RESOURCE_FLAG_NONE;
-	resdesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-	
-	auto dev = Dx12Device::Instance().GetDevice();
-	// 頂点バッファの作成
-	auto result = dev->CreateCommittedResource(&heapprop, D3D12_HEAP_FLAG_NONE, &resdesc,
-								D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&vertexBuffer));
-
-	std::vector<unsigned short> indices = { 0,1,2, 1,2,3 };	// 頂点を使用する順番
-	// インデックスバッファの作成
-	result = dev->CreateCommittedResource(&heapprop, D3D12_HEAP_FLAG_NONE,
-		&CD3DX12_RESOURCE_DESC::Buffer(indices.size() * sizeof(indices[0])),
-		D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&indexBuffer));
-
-	D3D12_RANGE range = { 0,0 };
-	Vertex* vertexMap = nullptr;
-	result = vertexBuffer->Map(0, nullptr, (void**)& vertexMap);
-	std::copy(std::begin(vertices), std::end(vertices), vertexMap);
-	vertexBuffer->Unmap(0, nullptr);
-
-	vbView.BufferLocation = vertexBuffer->GetGPUVirtualAddress();
-	vbView.StrideInBytes = sizeof(Vertex);	// 頂点1つあたりのバイト数
-	vbView.SizeInBytes = sizeof(vertices);	// データ全体のサイズ
-
-	ibView.BufferLocation = indexBuffer->GetGPUVirtualAddress();	// バッファの場所
-	ibView.Format = DXGI_FORMAT_R16_UINT;	// フォーマット(shortなのでR16)
-	ibView.SizeInBytes = indices.size() * sizeof(indices[0]);		// 総サイズ
 }
 
 void Dx12Wrapper::InitShader()
@@ -449,7 +398,7 @@ void Dx12Wrapper::InitShadowShader()
 
 void Dx12Wrapper::InitShadowRootSignature()
 {
-	D3D12_DESCRIPTOR_RANGE shadowDescRange[3] = {};
+	D3D12_DESCRIPTOR_RANGE shadowDescRange[2] = {};
 	// "b0"	カメラ
 	shadowDescRange[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
 	shadowDescRange[0].BaseShaderRegister = 0;
@@ -460,14 +409,9 @@ void Dx12Wrapper::InitShadowRootSignature()
 	shadowDescRange[1].BaseShaderRegister = 1;
 	shadowDescRange[1].NumDescriptors = 1;
 	shadowDescRange[1].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
-	// "t0" 影
-	shadowDescRange[2].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-	shadowDescRange[2].BaseShaderRegister = 0;
-	shadowDescRange[2].NumDescriptors = 1;
-	shadowDescRange[2].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
 
-	D3D12_ROOT_PARAMETER ShadowRootParam[3] = {};
+	D3D12_ROOT_PARAMETER ShadowRootParam[2] = {};
 	ShadowRootParam[0].DescriptorTable.NumDescriptorRanges = 1;
 	ShadowRootParam[0].DescriptorTable.pDescriptorRanges = shadowDescRange;
 	ShadowRootParam[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
@@ -477,11 +421,6 @@ void Dx12Wrapper::InitShadowRootSignature()
 	ShadowRootParam[1].DescriptorTable.pDescriptorRanges = &shadowDescRange[1];
 	ShadowRootParam[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
 	ShadowRootParam[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-
-	ShadowRootParam[2].DescriptorTable.NumDescriptorRanges = 1;
-	ShadowRootParam[2].DescriptorTable.pDescriptorRanges = &shadowDescRange[2];
-	ShadowRootParam[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-	ShadowRootParam[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
 
 	D3D12_STATIC_SAMPLER_DESC samplerDesc = {};
@@ -500,7 +439,7 @@ void Dx12Wrapper::InitShadowRootSignature()
 
 	D3D12_ROOT_SIGNATURE_DESC rsd = {};
 	rsd.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
-	rsd.NumParameters = 3;
+	rsd.NumParameters = 2;
 	rsd.pParameters = ShadowRootParam;
 	rsd.NumStaticSamplers = 1;
 	rsd.pStaticSamplers = &samplerDesc;
@@ -635,10 +574,10 @@ void Dx12Wrapper::CreateScreenTexture()
 {
 	Vertex vertices[] = {
 		// 正面
-		{DirectX::XMFLOAT3(-1, -1, 0), DirectX::XMFLOAT2(0, 1)},// 左下
-		{DirectX::XMFLOAT3(-1, 1, 0), DirectX::XMFLOAT2(0, 0)},	// 左上
-		{DirectX::XMFLOAT3(1, -1, 0), DirectX::XMFLOAT2(1, 1)},	// 右下
-		{DirectX::XMFLOAT3(1, 1, 0), DirectX::XMFLOAT2(1, 0)} ,	// 右上
+		{DirectX::XMFLOAT3(-1, -1, 0),	DirectX::XMFLOAT2(0, 1)},	// 左下
+		{DirectX::XMFLOAT3(-1, 1, 0),	DirectX::XMFLOAT2(0, 0)},	// 左上
+		{DirectX::XMFLOAT3(1, -1, 0),	DirectX::XMFLOAT2(1, 1)},	// 右下
+		{DirectX::XMFLOAT3(1, 1, 0),	DirectX::XMFLOAT2(1, 0)},	// 右上
 	};
 
 	auto dev = Dx12Device::Instance().GetDevice();
@@ -679,9 +618,9 @@ void Dx12Wrapper::InitLastRootSignature()
 	// サンプラの設定
 	D3D12_STATIC_SAMPLER_DESC samplerDesc = {};
 	samplerDesc.Filter = D3D12_FILTER_MIN_MAG_LINEAR_MIP_POINT;	// 特別なフィルタを使用しない
-	samplerDesc.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;		// 絵が繰り返される(U方向)
-	samplerDesc.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;		// 絵が繰り返される(V方向)
-	samplerDesc.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;		// 絵が繰り返される(W方向)
+	samplerDesc.AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+	samplerDesc.AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+	samplerDesc.AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
 	samplerDesc.MaxLOD = D3D12_FLOAT32_MAX;		// MIPMAP上限なし
 	samplerDesc.MinLOD = 0.0f;					// MIPMAP下限なし
 	samplerDesc.BorderColor = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;	// エッジのいろ(黒透明)
@@ -819,8 +758,7 @@ Dx12Wrapper::Dx12Wrapper(HWND hwnd)
 	result = dev->CreateFence(fenceValue, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence));
 	
 	// PMDモデルの読み込み
-	//modelPath = "model/vocaloid/巡音ルカ.pmd";
-	//modelPath = "model/hibiki/我那覇響v1.pmd";
+	//pmdManagers.emplace_back(new PMDManager("model/vocaloid/巡音ルカ.pmd");
 	//pmdManagers.emplace_back(new PMDManager("model/hibiki/我那覇響v1_グラビアミズギ.pmd"));
 	//pmdManagers.emplace_back(new PMDManager("model/yayoi/やよいヘッド_カジュアル（体x0.96）改造.pmd"));
 	pmdManagers.emplace_back(new PMDManager("model/vocaloid/初音ミク.pmd"));
@@ -830,10 +768,8 @@ Dx12Wrapper::Dx12Wrapper(HWND hwnd)
 	pmdManagers.emplace_back(new PMDManager("model/vocaloid/初音ミク.pmd"));
 
 	// VMDの読み込み
-	//vmdPath = "motion/pose.vmd";
-	//vmdPath = "motion/charge.vmd";
-	//vmdPath = "motion/ヤゴコロダンス.vmd";
-	//vmdPath = "motion/PBA_Solo.vmd";// Princess Be Ambitious!!
+	//vmdLoaders.emplace_back(new VMDLoader(motion/ヤゴコロダンス.vmd");
+	//vmdLoaders.emplace_back(new VMDLoader("motion/PBA_Solo.vmd");// Princess Be Ambitious!!
 	vmdLoaders.emplace_back(new VMDLoader("motion/Kimagure Mercy motion配布用/配布用Tda/Miku.vmd"));
 	vmdLoaders.emplace_back(new VMDLoader("motion/Kimagure Mercy motion配布用/配布用Tda/Teto.vmd"));
 	vmdLoaders.emplace_back(new VMDLoader("motion/Kimagure Mercy motion配布用/配布用Tda/Luka.vmd"));
@@ -985,10 +921,6 @@ void Dx12Wrapper::Update()
 	m->world *= DirectX::XMMatrixRotationY(angle.x);	// 回転
 	m->world *= DirectX::XMMatrixRotationX(angle.y);
 
-	//DirectX::XMFLOAT4 p(0, 1, 0, 0);	// 平面の方程式
-	//DirectX::XMFLOAT4 l(-1, 1, -1, 0);	// ライトの座標	
-	//m->world *= DirectX::XMMatrixShadow(DirectX::XMLoadFloat4(&p), DirectX::XMLoadFloat4(&l));
-
 	// 固定フレームにする
 	frame = ((GetTickCount64() - startTime) / 30) % maxFrame;
 
@@ -1045,7 +977,6 @@ void Dx12Wrapper::Draw()
 	cmdList->ClearDepthStencilView(sdsvh, D3D12_CLEAR_FLAG_DEPTH, 1.f, 0, 0, nullptr);
 
 	// バリアを解除
-	//UnlockBarrier(shadowBuff);
 	cmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(shadowBuff,
 		D3D12_RESOURCE_STATE_DEPTH_READ, D3D12_RESOURCE_STATE_DEPTH_WRITE));
 
@@ -1055,7 +986,6 @@ void Dx12Wrapper::Draw()
 	}
 
 	// バリアを張る
-	//SetBarrier();
 	cmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(shadowBuff,
 		D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_DEPTH_READ));
 

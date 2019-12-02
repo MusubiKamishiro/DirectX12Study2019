@@ -52,8 +52,7 @@ private:
 	void CreateSwapChain(HWND hwnd);
 	// レンダーターゲットの作成
 	void CreateRenderTarget();
-	// 頂点バッファの作成
-	void CreateVertexBuffer();
+	
 
 	// シェーダの初期化
 	void InitShader();
@@ -134,11 +133,6 @@ private:
 	
 	ID3D12DescriptorHeap* rtvDescriptorHeap = nullptr;	// レンダーターゲットビュー用のヒープ
 	std::vector<ID3D12Resource*> backBuffers;
-
-	ID3D12Resource* vertexBuffer = nullptr;	// 頂点バッファ
-	ID3D12Resource* indexBuffer = nullptr;	// インデックスバッファ
-	D3D12_VERTEX_BUFFER_VIEW vbView = {};	// 頂点バッファビュー
-	D3D12_INDEX_BUFFER_VIEW ibView = {};	// インデックスバッファビュー
 
 	UINT64 fenceValue = 0;
 	UINT bbIdx = 0;
