@@ -915,11 +915,11 @@ void Dx12Wrapper::Update()
 		}
 	}
 	
-	//Dx12Constants::Instance().Update(vmdCamera->GetCameraData(), frame);
-	auto m = Dx12Constants::Instance().GetMappedMatrix();
-	m->world *= DirectX::XMMatrixTranslation(pos.x, pos.y, pos.z);
-	m->world *= DirectX::XMMatrixRotationY(angle.x);	// ‰ñ“]
-	m->world *= DirectX::XMMatrixRotationX(angle.y);
+	Dx12Constants::Instance().Update(vmdCamera->GetCameraData(), frame);
+	//auto m = Dx12Constants::Instance().GetMappedMatrix();
+	//m->world *= DirectX::XMMatrixTranslation(pos.x, pos.y, pos.z);
+	//m->world *= DirectX::XMMatrixRotationY(angle.x);	// ‰ñ“]
+	//m->world *= DirectX::XMMatrixRotationX(angle.y);
 
 	// ŒÅ’èƒtƒŒ[ƒ€‚É‚·‚é
 	frame = ((GetTickCount64() - startTime) / 30) % maxFrame;

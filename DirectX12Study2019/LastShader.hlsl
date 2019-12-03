@@ -33,11 +33,11 @@ float4 ps(Output output) : SV_TARGET
 		// ƒ‚ƒmƒNƒF
 		//ret = dot(float3(0.2126f, 0.7152f, 0.0722f), ret);
 		// —ÖŠsü’Šo
-		ret *= 4;
+		/*ret *= 4;
 		ret -= tex.Sample(smp, output.uv, int2(0, -2));
 		ret -= tex.Sample(smp, output.uv, int2(0, 2));
 		ret -= tex.Sample(smp, output.uv, int2(2, 0));
-		ret -= tex.Sample(smp, output.uv, int2(-2, 0));
+		ret -= tex.Sample(smp, output.uv, int2(-2, 0));*/
 	}
 		
 	return float4(ret, 1.0f);

@@ -28,28 +28,30 @@ Dx12Constants::Dx12Constants()
 	auto focusPos = DirectX::XMFLOAT3(0, 10, 0);	// 焦点の位置(注視点)
 	auto up = DirectX::XMFLOAT3(0.0f, 1.0f, 0.0f);	// カメラの上方向(通常は(0.0f, 1.0f, 0.0f))	// カメラを固定するためのもの
 
-	// DirectX::XMMatrixLookAtLHの中身
-	/*DirectX::XMVECTOR EyeDirection = DirectX::XMVectorSubtract(XMLoadFloat3(&focusPos), XMLoadFloat3(&eyePos));
-
+	/*// DirectX::XMMatrixLookAtLHの中身
+	// 視点と注視点の差を求める,その結果を正規化
+	DirectX::XMVECTOR EyeDirection = DirectX::XMVectorSubtract(XMLoadFloat3(&focusPos), XMLoadFloat3(&eyePos));
 	DirectX::XMVECTOR R2 = DirectX::XMVector3Normalize(EyeDirection);
-
+	// 上方向と正規化した距離の外積,その結果を正規化
 	DirectX::XMVECTOR R0 = DirectX::XMVector3Cross(XMLoadFloat3(&up), R2);
 	R0 = DirectX::XMVector3Normalize(R0);
-
+	// 正規化した距離と正規化した外積の外積
 	DirectX::XMVECTOR R1 = DirectX::XMVector3Cross(R2, R0);
-
+	// 視点のベクトルの否定を求める
 	DirectX::XMVECTOR NegEyePosition = DirectX::XMVectorNegate(XMLoadFloat3(&eyePos));
-
+	// それぞれの内積
 	DirectX::XMVECTOR D0 = DirectX::XMVector3Dot(R0, NegEyePosition);
 	DirectX::XMVECTOR D1 = DirectX::XMVector3Dot(R1, NegEyePosition);
 	DirectX::XMVECTOR D2 = DirectX::XMVector3Dot(R2, NegEyePosition);
-
+	// コンポーネントごとの選択の結果を返す
 	DirectX::XMMATRIX M;
+	DirectX::XMVECTORU32 g_XMSelect1110 = { { { 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0x00000000 } } };
 	M.r[0] = DirectX::XMVectorSelect(D0, R0, g_XMSelect1110.v);
 	M.r[1] = DirectX::XMVectorSelect(D1, R1, g_XMSelect1110.v);
 	M.r[2] = DirectX::XMVectorSelect(D2, R2, g_XMSelect1110.v);
+	DirectX::XMVECTORF32 g_XMIdentityR3 = { { { 0.0f, 0.0f, 0.0f, 1.0f } } };
 	M.r[3] = g_XMIdentityR3.v;
-
+	// Mを転置する
 	M = XMMatrixTranspose(M);*/
 	// ここまで中身
 	//DirectX::XMMATRIX camera = M;
@@ -58,13 +60,13 @@ Dx12Constants::Dx12Constants()
 
 	auto aspect = (float)wsize.width / (float)wsize.height;		// ビュー空間の高さと幅のアスペクト比
 	DirectX::XMMATRIX projection = DirectX::XMMatrixPerspectiveFovLH(3.1415f / 2.0f, aspect, 0.5f, 300.0f);		// 射影行列	// LH...LeftHandの略,RHもあるよ
-	DirectX::XMMATRIX lightProj = DirectX::XMMatrixOrthographicLH(100, 100, 0.5f, 300.0f);
-
+	
 	mappedMatrix.viewProj = camera * projection;	// かける順番には気を付けよう
 	mappedMatrix.wvp = world * camera * projection;
 
 	auto lightPos = DirectX::XMFLOAT3(50, 70, -15);
 	DirectX::XMMATRIX lcamera = DirectX::XMMatrixLookAtLH(XMLoadFloat3(&lightPos), XMLoadFloat3(&focusPos), XMLoadFloat3(&up));
+	DirectX::XMMATRIX lightProj = DirectX::XMMatrixOrthographicLH(200, 200, 0.5f, 300.0f);
 	mappedMatrix.lightVP = lcamera * lightProj;
 
 	size_t size = sizeof(mappedMatrix);
@@ -91,32 +93,57 @@ void Dx12Constants::CameraMove(const VMDCameraData& cameraData, const VMDCameraD
 	focusPos.y = (nextCameraData.location.y - cameraData.location.y) * t + cameraData.location.y;
 	focusPos.z = (nextCameraData.location.z - cameraData.location.z) * t + cameraData.location.z;
 	
-	DirectX::XMFLOAT3 rotation;	// カメラの角度
-	rotation.x = (nextCameraData.rotation.x - cameraData.rotation.x) * t + cameraData.rotation.x;
-	rotation.y = (nextCameraData.rotation.y - cameraData.rotation.y) * t + cameraData.rotation.y;
-	rotation.z = (nextCameraData.rotation.z - cameraData.rotation.z) * t + cameraData.rotation.z;
+	//DirectX::XMFLOAT3 rotation;	// カメラの角度
+	//rotation.x = (nextCameraData.rotation.x - cameraData.rotation.x) * t + cameraData.rotation.x;
+	//rotation.y = (nextCameraData.rotation.y - cameraData.rotation.y) * t + cameraData.rotation.y;
+	//rotation.z = (nextCameraData.rotation.z - cameraData.rotation.z) * t + cameraData.rotation.z;
 	
-	auto lenght = (nextCameraData.length - cameraData.length) * t + cameraData.length;	// 注視点からの距離
+	float length = (nextCameraData.length - cameraData.length) * t + cameraData.length;	// 注視点からの距離
 	//auto eyePos = DirectX::XMFLOAT3(focusPos.x + lenght * rotation.x, focusPos.y + lenght * rotation.y, focusPos.z + lenght * rotation.z);	// カメラの位置(視点)
-	auto eyePos = DirectX::XMFLOAT3(focusPos.x, focusPos.y, focusPos.z + lenght);	// カメラの位置(視点)
+	auto eyePos = DirectX::XMFLOAT3(focusPos.x, focusPos.y, focusPos.z + length);	// カメラの位置(視点)
 
 	// 長さが0の時はlocationがカメラの座標になる
-	if (lenght == 0.00f)
+	if (length == 0.00f)
 	{
-		focusPos = DirectX::XMFLOAT3(0, focusPos.y, 0);	// 焦点の位置(注視点)
+		focusPos.z = 0;
 	}
 	auto up = DirectX::XMFLOAT3(0.0f, 1.0f, 0.0f);	// カメラの上方向(通常は(0.0f, 1.0f, 0.0f))	// カメラを固定するためのもの
 
-	DirectX::XMMATRIX camera = DirectX::XMMatrixLookAtLH(DirectX::XMLoadFloat3(&eyePos), DirectX::XMLoadFloat3(&focusPos), DirectX::XMLoadFloat3(&up));	// カメラ行列
-
+	//// DirectX::XMMatrixLookAtLHの中身
+	//// 視点と注視点の差を求める,その結果を正規化
+	//DirectX::XMVECTOR EyeDirection = { 0, 0, -cameraData.length, 0 };
+	//DirectX::XMVECTOR R2 = DirectX::XMVector3Normalize(EyeDirection);
+	//// 上方向と正規化した距離の外積,その結果を正規化
+	//DirectX::XMVECTOR R0 = DirectX::XMVector3Cross(XMLoadFloat3(&up), R2);
+	//R0 = DirectX::XMVector3Normalize(R0);
+	//// 正規化した距離と正規化した外積の外積
+	//DirectX::XMVECTOR R1 = DirectX::XMVector3Cross(R2, R0);
+	//// 視点のベクトルの否定を求める
+	//DirectX::XMVECTOR NegEyePosition = DirectX::XMVectorNegate(XMLoadFloat3(&eyePos));
+	//// それぞれの内積
+	//DirectX::XMVECTOR D0 = DirectX::XMVector3Dot(R0, NegEyePosition);
+	//DirectX::XMVECTOR D1 = DirectX::XMVector3Dot(R1, NegEyePosition);
+	//DirectX::XMVECTOR D2 = DirectX::XMVector3Dot(R2, NegEyePosition);
+	//// コンポーネントごとの選択の結果を返す
+	//DirectX::XMMATRIX M;
+	//DirectX::XMVECTORU32 g_XMSelect1110 = { { { 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0x00000000 } } };
+	//M.r[0] = DirectX::XMVectorSelect(D0, R0, g_XMSelect1110.v);
+	//M.r[1] = DirectX::XMVectorSelect(D1, R1, g_XMSelect1110.v);
+	//M.r[2] = DirectX::XMVectorSelect(D2, R2, g_XMSelect1110.v);
+	//DirectX::XMVECTORF32 g_XMIdentityR3 = { { { 0.0f, 0.0f, 0.0f, 1.0f } } };
+	//M.r[3] = g_XMIdentityR3.v;
+	//// Mを転置する
+	//DirectX::XMMATRIX camera = XMMatrixTranspose(M);
+	//// ここまで中身
+	DirectX::XMMATRIX camera = DirectX::XMMatrixLookAtLH(XMLoadFloat3(&eyePos), XMLoadFloat3(&focusPos), XMLoadFloat3(&up));
+	
 	auto wsize = Application::Instance().GetWindowSize();	// 画面サイズ
 	auto aspect = (float)wsize.width / (float)wsize.height;	// ビュー空間の高さと幅のアスペクト比
-																		// 視野角
 	DirectX::XMMATRIX projection = DirectX::XMMatrixPerspectiveFovLH((3.1415f / 180.0f) * cameraData.viewIngAngle, aspect, 0.5f, 300.0f);		// 射影行列	// LH...LeftHandの略,RHもあるよ
 
 	DirectX::XMMATRIX world = DirectX::XMMatrixIdentity();
 	mappedMatrix.world = world;
-	mappedMatrix.viewProj = camera * projection;	// かける順番には気を付けよう
+	mappedMatrix.viewProj = camera * projection;
 	mappedMatrix.wvp = world * camera * projection;
 
 	*m = mappedMatrix;
