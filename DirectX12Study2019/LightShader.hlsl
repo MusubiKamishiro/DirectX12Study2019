@@ -44,11 +44,11 @@ Output vs(float4 pos : POSITION, float4 normal : NORMAL, float2 uv : TEXCOORD, m
 	return output;
 }
 
-float4 ps(Output output) : SV_TARGET
-{
-	float depth = shadow.Sample(smp, output.uv);
-	depth = pow(depth, 50);
-
-	//return float4(depth, depth, depth, 1.0f);
-	return float4(0.0f, 0.0f, 1.0f, 1.0f);
-}
+//float4 ps(Output output) : SV_TARGET
+//{
+//	float depth = shadow.Sample(smp, output.uv);
+//	depth = pow(depth, 50);
+//
+//	//return float4(depth, depth, depth, 1.0f);
+//	return float4(0.0f, 0.0f, 1.0f, 1.0f);
+//}

@@ -3,6 +3,10 @@
 #include <DirectXTex.h>
 #include "d3dx12.h"
 
+#include "imgui/imgui.h"
+#include "imgui/imgui_impl_dx12.h"
+#include "imgui/imgui_impl_win32.h"
+
 #include "Application.h"
 #include "Dx12Device.h"
 #include "Dx12Constants.h"
@@ -120,7 +124,8 @@ void Dx12Wrapper::InitShader()
 
 void Dx12Wrapper::InitRootSignature()
 {
-	D3D12_DESCRIPTOR_RANGE descRange[4] = {};
+	std::vector<D3D12_DESCRIPTOR_RANGE> descRange;
+	descRange.resize(4);
 	// "b0"	wvp
 	descRange[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
 	descRange[0].BaseShaderRegister = 0;	// レジスタ番号
@@ -143,7 +148,8 @@ void Dx12Wrapper::InitRootSignature()
 	descRange[3].NumDescriptors = 1;		// 1回で読む数
 	descRange[3].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
-	D3D12_ROOT_PARAMETER rootParam[3] = {};
+	std::vector<D3D12_ROOT_PARAMETER> rootParam;
+	rootParam.resize(3);
 	rootParam[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
 	rootParam[0].DescriptorTable.NumDescriptorRanges = 1;			// レンジの数
 	rootParam[0].DescriptorTable.pDescriptorRanges = &descRange[0];	// 対応するレンジへのポインタ
@@ -177,9 +183,9 @@ void Dx12Wrapper::InitRootSignature()
 
 	D3D12_ROOT_SIGNATURE_DESC rsd = {};
 	rsd.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
-	rsd.NumParameters = 3;
+	rsd.NumParameters = rootParam.size();
 	rsd.NumStaticSamplers = 1;
-	rsd.pParameters = &rootParam[0];
+	rsd.pParameters = &rootParam.front();
 	rsd.pStaticSamplers = &samplerDesc;
 
 	ID3DBlob* signature = nullptr;		// ルートシグネチャをつくるための材料
@@ -293,22 +299,23 @@ void Dx12Wrapper::ClearCmd(ID3D12PipelineState* pipelinestate, ID3D12RootSignatu
 	cmdList->SetGraphicsRootSignature(rootsignature);
 }
 
-void Dx12Wrapper::UnlockBarrier(ID3D12Resource* buffer)
+void Dx12Wrapper::UnlockBarrier(ID3D12Resource* buffer, const D3D12_RESOURCE_STATES& before, const D3D12_RESOURCE_STATES& after)
 {
 	BarrierDesc.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
 	BarrierDesc.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
 	BarrierDesc.Transition.pResource = buffer;
 	BarrierDesc.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-	BarrierDesc.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
-	BarrierDesc.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
+	BarrierDesc.Transition.StateBefore = before;
+	BarrierDesc.Transition.StateAfter = after;
+	
 	// バリアを解除
 	cmdList->ResourceBarrier(1, &BarrierDesc);
 }
 
-void Dx12Wrapper::SetBarrier()
+void Dx12Wrapper::SetBarrier(const D3D12_RESOURCE_STATES& before, const D3D12_RESOURCE_STATES& after)
 {
-	BarrierDesc.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
-	BarrierDesc.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
+	BarrierDesc.Transition.StateBefore = before;
+	BarrierDesc.Transition.StateAfter = after;
 	// バリアをセット
 	cmdList->ResourceBarrier(1, &BarrierDesc);
 }
@@ -390,7 +397,6 @@ void Dx12Wrapper::CreateShadowBuff()
 void Dx12Wrapper::InitShadowShader()
 {
 	auto result = D3DCompileFromFile(L"LightShader.hlsl", nullptr, nullptr, "vs", "vs_5_0", 0, 0, &shadowVertexShader, nullptr);
-	result = D3DCompileFromFile(L"LightShader.hlsl", nullptr, nullptr, "ps", "ps_5_0", 0, 0, &shadowPixelShader, nullptr);
 
 	InitShadowRootSignature();
 	InitShadowPipelineState();
@@ -398,7 +404,8 @@ void Dx12Wrapper::InitShadowShader()
 
 void Dx12Wrapper::InitShadowRootSignature()
 {
-	D3D12_DESCRIPTOR_RANGE shadowDescRange[2] = {};
+	std::vector<D3D12_DESCRIPTOR_RANGE> shadowDescRange;
+	shadowDescRange.resize(2);
 	// "b0"	カメラ
 	shadowDescRange[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
 	shadowDescRange[0].BaseShaderRegister = 0;
@@ -411,16 +418,17 @@ void Dx12Wrapper::InitShadowRootSignature()
 	shadowDescRange[1].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
 
-	D3D12_ROOT_PARAMETER ShadowRootParam[2] = {};
-	ShadowRootParam[0].DescriptorTable.NumDescriptorRanges = 1;
-	ShadowRootParam[0].DescriptorTable.pDescriptorRanges = shadowDescRange;
-	ShadowRootParam[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-	ShadowRootParam[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+	std::vector<D3D12_ROOT_PARAMETER> shadowRootParam;
+	shadowRootParam.resize(2);
+	shadowRootParam[0].DescriptorTable.NumDescriptorRanges = 1;
+	shadowRootParam[0].DescriptorTable.pDescriptorRanges = &shadowDescRange[0];
+	shadowRootParam[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+	shadowRootParam[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
-	ShadowRootParam[1].DescriptorTable.NumDescriptorRanges = 1;
-	ShadowRootParam[1].DescriptorTable.pDescriptorRanges = &shadowDescRange[1];
-	ShadowRootParam[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-	ShadowRootParam[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+	shadowRootParam[1].DescriptorTable.NumDescriptorRanges = 1;
+	shadowRootParam[1].DescriptorTable.pDescriptorRanges = &shadowDescRange[1];
+	shadowRootParam[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+	shadowRootParam[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
 
 	D3D12_STATIC_SAMPLER_DESC samplerDesc = {};
@@ -439,8 +447,8 @@ void Dx12Wrapper::InitShadowRootSignature()
 
 	D3D12_ROOT_SIGNATURE_DESC rsd = {};
 	rsd.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
-	rsd.NumParameters = 2;
-	rsd.pParameters = ShadowRootParam;
+	rsd.NumParameters = shadowRootParam.size();
+	rsd.pParameters = &shadowRootParam.front();
 	rsd.NumStaticSamplers = 1;
 	rsd.pStaticSamplers = &samplerDesc;
 
@@ -474,7 +482,6 @@ void Dx12Wrapper::InitShadowPipelineState()
 	shadowGPSDesc.InputLayout.NumElements = _countof(shadowLayouts);
 	// シェーダ系
 	shadowGPSDesc.VS = CD3DX12_SHADER_BYTECODE(shadowVertexShader);
-	shadowGPSDesc.PS = CD3DX12_SHADER_BYTECODE(shadowPixelShader);
 	// 深度ステンシル
 	shadowGPSDesc.DepthStencilState.DepthEnable = true;
 	shadowGPSDesc.DepthStencilState.StencilEnable = false;
@@ -602,18 +609,21 @@ void Dx12Wrapper::CreateScreenTexture()
 
 void Dx12Wrapper::InitLastRootSignature()
 {
-	D3D12_DESCRIPTOR_RANGE descRange[1] = {};
+	std::vector<D3D12_DESCRIPTOR_RANGE> descRange;
+	descRange.resize(1);
 	// "t0" テクスチャ
 	descRange[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
 	descRange[0].BaseShaderRegister = 0;	// レジスタ番号
 	descRange[0].NumDescriptors = 1;		// 1回で読む数
 	descRange[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
-	
-	D3D12_ROOT_PARAMETER rootParam[1] = {};
+
+	std::vector<D3D12_ROOT_PARAMETER> rootParam;
+	rootParam.resize(1);
 	rootParam[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
 	rootParam[0].DescriptorTable.NumDescriptorRanges = 1;			// レンジの数
 	rootParam[0].DescriptorTable.pDescriptorRanges = &descRange[0];	// 対応するレンジへのポインタ
 	rootParam[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+
 
 	// サンプラの設定
 	D3D12_STATIC_SAMPLER_DESC samplerDesc = {};
@@ -632,9 +642,9 @@ void Dx12Wrapper::InitLastRootSignature()
 
 	D3D12_ROOT_SIGNATURE_DESC rsd = {};
 	rsd.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
-	rsd.NumParameters = 1;
+	rsd.NumParameters = rootParam.size();
 	rsd.NumStaticSamplers = 1;
-	rsd.pParameters = &rootParam[0];
+	rsd.pParameters = &rootParam.front();
 	rsd.pStaticSamplers = &samplerDesc;
 
 	ID3DBlob* signature = nullptr;		// ルートシグネチャをつくるための材料
@@ -741,6 +751,46 @@ void Dx12Wrapper::EffekseerInit()
 
 }
 
+void Dx12Wrapper::ImGuiInit(HWND hwnd)
+{
+	auto dev = Dx12Device::Instance().GetDevice();
+
+	// ヒープの設定
+	D3D12_DESCRIPTOR_HEAP_DESC descHeapDesc = {};
+	descHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+	descHeapDesc.NodeMask = 0;
+	descHeapDesc.NumDescriptors = 1;
+	descHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+	// ヒープ作成
+	auto result = dev->CreateDescriptorHeap(&descHeapDesc, IID_PPV_ARGS(&imguiHeap));
+
+	// 初期化
+	ImGui::CreateContext();
+
+	bool imguiResult = ImGui_ImplWin32_Init(hwnd);
+	imguiResult = ImGui_ImplDX12_Init(dev, 2, DXGI_FORMAT_R8G8B8A8_UNORM, imguiHeap, 
+		imguiHeap->GetCPUDescriptorHandleForHeapStart(), imguiHeap->GetGPUDescriptorHandleForHeapStart());
+}
+
+void Dx12Wrapper::ImGuiDraw()
+{
+	ImGui_ImplDX12_NewFrame();
+	ImGui_ImplWin32_NewFrame();
+	ImGui::NewFrame();
+	ImGui::SetNextWindowSize(ImVec2(200, 300));
+	ImGui::Begin("test");
+	ImGui::Text("yatta");
+	ImGui::Separator();		//区切り線
+	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+	/*bool flag = false;
+	ImGui::Checkbox("flag", &flag);*/
+	//ImGui::ColorPicker4("ColorPicker4", clearColor);
+	ImGui::End();
+	ImGui::Render();
+	cmdList->SetDescriptorHeaps(1, &imguiHeap);
+	ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), cmdList);
+}
+
 Dx12Wrapper::Dx12Wrapper(HWND hwnd)
 {
 #ifdef _DEBUG
@@ -820,6 +870,9 @@ Dx12Wrapper::Dx12Wrapper(HWND hwnd)
 	maxFrame = vmdLoaders[0]->GetMaxFrame();
 
 	EffekseerInit();
+
+	// imgui関係
+	ImGuiInit(hwnd);
 }
 
 Dx12Wrapper::~Dx12Wrapper()
@@ -856,7 +909,6 @@ Dx12Wrapper::~Dx12Wrapper()
 	shadowRootSignature->Release();
 	shadowPipelineState->Release();
 	shadowVertexShader->Release();
-	shadowPixelShader->Release();
 
 	floorImgHeap->Release();
 
@@ -866,6 +918,11 @@ Dx12Wrapper::~Dx12Wrapper()
 	efkCmdList->Release();
 	effect->UnloadResources();
 	effect->Release();
+
+	imguiHeap->Release();
+	ImGui_ImplDX12_Shutdown();
+	ImGui_ImplWin32_Shutdown();
+	ImGui::DestroyContext();
 }
 
 void Dx12Wrapper::Update()
@@ -977,8 +1034,7 @@ void Dx12Wrapper::Draw()
 	cmdList->ClearDepthStencilView(sdsvh, D3D12_CLEAR_FLAG_DEPTH, 1.f, 0, 0, nullptr);
 
 	// バリアを解除
-	cmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(shadowBuff,
-		D3D12_RESOURCE_STATE_DEPTH_READ, D3D12_RESOURCE_STATE_DEPTH_WRITE));
+	UnlockBarrier(shadowBuff, D3D12_RESOURCE_STATE_DEPTH_READ, D3D12_RESOURCE_STATE_DEPTH_WRITE);
 
 	for (auto& pmd : pmdManagers)
 	{
@@ -986,8 +1042,7 @@ void Dx12Wrapper::Draw()
 	}
 
 	// バリアを張る
-	cmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(shadowBuff,
-		D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_DEPTH_READ));
+	SetBarrier(D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_PRESENT);
 
 	cmdList->Close();
 	ExecuteCmd();
@@ -1003,13 +1058,13 @@ void Dx12Wrapper::Draw()
 
 	auto dev = Dx12Device::Instance().GetDevice();
 	auto heapStart = heapFor1stPassRTV->GetCPUDescriptorHandleForHeapStart();
-	float clearColor[] = { 1.0f, 1.0f, 1.0f, 1.0f };	// クリアカラー設定
 	cmdList->OMSetRenderTargets(1, &heapStart, false, &dsvHeap->GetCPUDescriptorHandleForHeapStart());		// レンダーターゲット設定
 	cmdList->ClearDepthStencilView(dsvHeap->GetCPUDescriptorHandleForHeapStart(), D3D12_CLEAR_FLAG_DEPTH, 1.f, 0, 0, nullptr);	// 深度バッファのクリア
 
 	// バリアの解除(ここから書き込みが始まる)
-	UnlockBarrier(firstPassBuff);
+	UnlockBarrier(firstPassBuff, D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
 	// 画面のクリア(これも書き込みに入る)
+	float clearColor[] = { 1.0f, 1.0f, 1.0f, 1.0f };	// クリアカラー設定
 	cmdList->ClearRenderTargetView(heapStart, clearColor, 0, nullptr);
 	// モデルの描画
 	for (auto& pmd : pmdManagers)
@@ -1037,7 +1092,7 @@ void Dx12Wrapper::Draw()
 	EffekseerRendererDX12::EndCommandList(efkCmdList);
 	
 	// バリアのセット
-	SetBarrier();
+	SetBarrier(D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
 
 	cmdList->Close();	// クローズ
 	ExecuteCmd();
@@ -1058,7 +1113,7 @@ void Dx12Wrapper::Draw()
 	cmdList->ClearDepthStencilView(dsvHeap->GetCPUDescriptorHandleForHeapStart(), D3D12_CLEAR_FLAG_DEPTH, 1.f, 0, 0, nullptr);	// 深度バッファのクリア
 
 	// バリアの解除(ここから書き込みが始まる)
-	UnlockBarrier(backBuffers[bbIdx]);
+	UnlockBarrier(backBuffers[bbIdx], D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
 	// 画面のクリア(これも書き込みに入る)
 	cmdList->ClearRenderTargetView(heapStart, clearColor, 0, nullptr);
 
@@ -1070,7 +1125,9 @@ void Dx12Wrapper::Draw()
 	// ペラポリ描画
 	cmdList->DrawInstanced(4, 1, 0, 0);
 
-
+	// imgui描画
+	ImGuiDraw();
+	
 	//////
 	//cmdList->SetDescriptorHeaps(1, &shadowSrvHeap);
 	//cmdList->SetGraphicsRootDescriptorTable(0, shadowSrvHeap->GetGPUDescriptorHandleForHeapStart());
@@ -1078,7 +1135,7 @@ void Dx12Wrapper::Draw()
 	//////
 
 	// バリアのセット
-	SetBarrier();
+	SetBarrier(D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
 
 	cmdList->Close();	// クローズ
 	ExecuteCmd();

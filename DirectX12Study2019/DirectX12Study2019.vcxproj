@@ -134,6 +134,12 @@
     <ClCompile Include="Dx12Device.cpp" />
     <ClCompile Include="Dx12Wrapper.cpp" />
     <ClCompile Include="ImageManager.cpp" />
+    <ClCompile Include="imgui\imgui.cpp" />
+    <ClCompile Include="imgui\imgui_demo.cpp" />
+    <ClCompile Include="imgui\imgui_draw.cpp" />
+    <ClCompile Include="imgui\imgui_impl_dx12.cpp" />
+    <ClCompile Include="imgui\imgui_impl_win32.cpp" />
+    <ClCompile Include="imgui\imgui_widgets.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Plane.cpp" />
     <ClCompile Include="PMDManager.cpp" />
@@ -147,6 +153,14 @@
     <ClInclude Include="Dx12Device.h" />
     <ClInclude Include="Dx12Wrapper.h" />
     <ClInclude Include="ImageManager.h" />
+    <ClInclude Include="imgui\imconfig.h" />
+    <ClInclude Include="imgui\imgui.h" />
+    <ClInclude Include="imgui\imgui_impl_dx12.h" />
+    <ClInclude Include="imgui\imgui_impl_win32.h" />
+    <ClInclude Include="imgui\imgui_internal.h" />
+    <ClInclude Include="imgui\imstb_rectpack.h" />
+    <ClInclude Include="imgui\imstb_textedit.h" />
+    <ClInclude Include="imgui\imstb_truetype.h" />
     <ClInclude Include="Plane.h" />
     <ClInclude Include="PMDManager.h" />
     <ClInclude Include="Primitive.h" />

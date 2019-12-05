@@ -76,9 +76,9 @@ private:
 	void ClearCmd(ID3D12PipelineState* pipelinestate, ID3D12RootSignature* rootsignature);
 
 	// バリアの解除
-	void UnlockBarrier(ID3D12Resource* buffer);
+	void UnlockBarrier(ID3D12Resource* buffer, const D3D12_RESOURCE_STATES& before, const D3D12_RESOURCE_STATES& after);
 	// バリアのセット
-	void SetBarrier();
+	void SetBarrier(const D3D12_RESOURCE_STATES& before, const D3D12_RESOURCE_STATES& after);
 
 	// コマンドキューに投げる
 	void ExecuteCmd();
@@ -101,7 +101,6 @@ private:
 	void InitShadowPipelineState();
 	ID3D12PipelineState* shadowPipelineState;
 	ID3DBlob* shadowVertexShader = nullptr;	// 頂点シェーダ
-	ID3DBlob* shadowPixelShader = nullptr;	// ピクセルシェーダ
 	// ライトからの撮影
 	void CreateLightView();
 
@@ -139,6 +138,9 @@ private:
 	
 	D3D12_RESOURCE_BARRIER BarrierDesc = {};	// バリア
 
+	// ルートシグネチャの作成
+	ID3DBlob* SerializeRootSignature();
+
 	// PMD関連
 	std::vector<std::shared_ptr<PMDManager>> pmdManagers;
 
@@ -159,7 +161,7 @@ private:
 	ID3D12Resource* floorImgBuff = nullptr;
 	ID3D12DescriptorHeap* floorImgHeap = nullptr;
 
-	// Effekseerテスト
+	// Effekseer
 	void EffekseerInit();
 	EffekseerRenderer::Renderer* efkRenderer;					// レンダラー
 	Effekseer::Manager* efkManager;								// マネージャー
@@ -167,6 +169,11 @@ private:
 	EffekseerRenderer::CommandList* efkCmdList;					// コマンドリスト
 	Effekseer::Effect* effect;		// エフェクト
 	Effekseer::Handle efkHandle;
+
+	// imgui関係
+	void ImGuiInit(HWND hwnd);
+	ID3D12DescriptorHeap* imguiHeap;
+	void ImGuiDraw();
 	
 public:
 	Dx12Wrapper(HWND hwnd);
