@@ -24,8 +24,8 @@ Dx12Constants::Dx12Constants()
 	mappedMatrix.world = world;
 
 	// カメラの設定
-	auto eyePos = DirectX::XMFLOAT3(0, 20, -30);	// カメラの位置(視点)
-	auto focusPos = DirectX::XMFLOAT3(0, 10, 0);	// 焦点の位置(注視点)
+	eyePos = DirectX::XMFLOAT3(0, 20, -30);
+	focusPos = DirectX::XMFLOAT3(0, 10, 0);
 	auto up = DirectX::XMFLOAT3(0.0f, 1.0f, 0.0f);	// カメラの上方向(通常は(0.0f, 1.0f, 0.0f))	// カメラを固定するためのもの
 
 	/*// DirectX::XMMatrixLookAtLHの中身
@@ -88,19 +88,19 @@ Dx12Constants::Dx12Constants()
 void Dx12Constants::CameraMove(const VMDCameraData& cameraData, const VMDCameraData& nextCameraData, const float& t)
 {
 	// カメラの設定
-	DirectX::XMFLOAT3 focusPos;	// 焦点の位置(注視点)
 	focusPos.x = (nextCameraData.location.x - cameraData.location.x) * t + cameraData.location.x;
 	focusPos.y = (nextCameraData.location.y - cameraData.location.y) * t + cameraData.location.y;
 	focusPos.z = (nextCameraData.location.z - cameraData.location.z) * t + cameraData.location.z;
 	
-	//DirectX::XMFLOAT3 rotation;	// カメラの角度
-	//rotation.x = (nextCameraData.rotation.x - cameraData.rotation.x) * t + cameraData.rotation.x;
-	//rotation.y = (nextCameraData.rotation.y - cameraData.rotation.y) * t + cameraData.rotation.y;
-	//rotation.z = (nextCameraData.rotation.z - cameraData.rotation.z) * t + cameraData.rotation.z;
+	DirectX::XMFLOAT3 rotation;	// カメラの角度
+	rotation.x = (nextCameraData.rotation.x - cameraData.rotation.x) * t + cameraData.rotation.x;
+	rotation.y = (nextCameraData.rotation.y - cameraData.rotation.y) * t + cameraData.rotation.y;
+	rotation.z = (nextCameraData.rotation.z - cameraData.rotation.z) * t + cameraData.rotation.z;
 	
 	float length = (nextCameraData.length - cameraData.length) * t + cameraData.length;	// 注視点からの距離
-	//auto eyePos = DirectX::XMFLOAT3(focusPos.x + lenght * rotation.x, focusPos.y + lenght * rotation.y, focusPos.z + lenght * rotation.z);	// カメラの位置(視点)
-	auto eyePos = DirectX::XMFLOAT3(focusPos.x, focusPos.y, focusPos.z + length);	// カメラの位置(視点)
+
+	eyePos = DirectX::XMFLOAT3(sin(-rotation.y) * length, cos(rotation.x) * -length, cos(rotation.z) * length);	// カメラの位置(視点)
+	//eyePos = DirectX::XMFLOAT3(sin(rotation.y) * length, cos(rotation.x) * -length, cos(rotation.z) * length);	// カメラの位置(視点)
 
 	// 長さが0の時はlocationがカメラの座標になる
 	if (length == 0.00f)
@@ -109,32 +109,6 @@ void Dx12Constants::CameraMove(const VMDCameraData& cameraData, const VMDCameraD
 	}
 	auto up = DirectX::XMFLOAT3(0.0f, 1.0f, 0.0f);	// カメラの上方向(通常は(0.0f, 1.0f, 0.0f))	// カメラを固定するためのもの
 
-	//// DirectX::XMMatrixLookAtLHの中身
-	//// 視点と注視点の差を求める,その結果を正規化
-	//DirectX::XMVECTOR EyeDirection = { 0, 0, -cameraData.length, 0 };
-	//DirectX::XMVECTOR R2 = DirectX::XMVector3Normalize(EyeDirection);
-	//// 上方向と正規化した距離の外積,その結果を正規化
-	//DirectX::XMVECTOR R0 = DirectX::XMVector3Cross(XMLoadFloat3(&up), R2);
-	//R0 = DirectX::XMVector3Normalize(R0);
-	//// 正規化した距離と正規化した外積の外積
-	//DirectX::XMVECTOR R1 = DirectX::XMVector3Cross(R2, R0);
-	//// 視点のベクトルの否定を求める
-	//DirectX::XMVECTOR NegEyePosition = DirectX::XMVectorNegate(XMLoadFloat3(&eyePos));
-	//// それぞれの内積
-	//DirectX::XMVECTOR D0 = DirectX::XMVector3Dot(R0, NegEyePosition);
-	//DirectX::XMVECTOR D1 = DirectX::XMVector3Dot(R1, NegEyePosition);
-	//DirectX::XMVECTOR D2 = DirectX::XMVector3Dot(R2, NegEyePosition);
-	//// コンポーネントごとの選択の結果を返す
-	//DirectX::XMMATRIX M;
-	//DirectX::XMVECTORU32 g_XMSelect1110 = { { { 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0x00000000 } } };
-	//M.r[0] = DirectX::XMVectorSelect(D0, R0, g_XMSelect1110.v);
-	//M.r[1] = DirectX::XMVectorSelect(D1, R1, g_XMSelect1110.v);
-	//M.r[2] = DirectX::XMVectorSelect(D2, R2, g_XMSelect1110.v);
-	//DirectX::XMVECTORF32 g_XMIdentityR3 = { { { 0.0f, 0.0f, 0.0f, 1.0f } } };
-	//M.r[3] = g_XMIdentityR3.v;
-	//// Mを転置する
-	//DirectX::XMMATRIX camera = XMMatrixTranspose(M);
-	//// ここまで中身
 	DirectX::XMMATRIX camera = DirectX::XMMatrixLookAtLH(XMLoadFloat3(&eyePos), XMLoadFloat3(&focusPos), XMLoadFloat3(&up));
 	
 	auto wsize = Application::Instance().GetWindowSize();	// 画面サイズ
@@ -201,4 +175,14 @@ ID3D12DescriptorHeap* Dx12Constants::GetRgstDescriptorHeap() const
 WVP* Dx12Constants::GetMappedMatrix() const
 {
 	return m;
+}
+
+const DirectX::XMFLOAT3& Dx12Constants::GetEyePos() const
+{
+	return eyePos;
+}
+
+const DirectX::XMFLOAT3& Dx12Constants::GetFocusPos() const
+{
+	return focusPos;
 }

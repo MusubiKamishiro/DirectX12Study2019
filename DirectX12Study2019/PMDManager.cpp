@@ -661,8 +661,8 @@ void PMDManager::Transformation(const DirectX::XMFLOAT3& pos, const DirectX::XMF
 	p.y = (nextpos.y - pos.y) * t + pos.y;
 	p.z = (nextpos.z - pos.z) * t + pos.z;
 
-	auto& center = boneMap["センター"];
-	boneMatrices[center.boneIdx] *= DirectX::XMMatrixTranslation(p.x, p.y, p.z);
+	auto& center = boneMap["センター"].boneIdx;
+	boneMatrices[center] *= DirectX::XMMatrixTranslation(p.x / 3, p.y / 3, p.z / 3);
 }
 
 void PMDManager::MotionUpdate(const std::map<std::string, std::vector<BoneKeyFrames>>& animationdata, const int& frame)
@@ -848,4 +848,11 @@ void PMDManager::ShadowDraw(ID3D12GraphicsCommandList* cmdList)
 		cmdList->DrawIndexedInstanced(m.faceVertCount, 1, offset, 0, 0);
 		offset += m.faceVertCount;
 	}
+}
+
+const DirectX::XMFLOAT3& PMDManager::GetPos()
+{
+	auto& center = boneMap["センター"].boneIdx;
+	
+	return DirectX::XMFLOAT3(boneMatrices[center].r[3].m128_f32[0], boneMatrices[center].r[3].m128_f32[1], boneMatrices[center].r[3].m128_f32[2]);
 }

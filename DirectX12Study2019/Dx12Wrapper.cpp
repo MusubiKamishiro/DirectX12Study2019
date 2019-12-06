@@ -777,11 +777,23 @@ void Dx12Wrapper::ImGuiDraw()
 	ImGui_ImplDX12_NewFrame();
 	ImGui_ImplWin32_NewFrame();
 	ImGui::NewFrame();
-	ImGui::SetNextWindowSize(ImVec2(200, 300));
+	ImGui::SetNextWindowSize(ImVec2(400, 300));
 	ImGui::Begin("test");
 	ImGui::Text("yatta");
 	ImGui::Separator();		//区切り線
 	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+	ImGui::Text("NowFrame %d", frame);
+	auto eye = Dx12Constants::Instance().GetEyePos();
+	ImGui::Text("CameraPos x:%.3f, y:%.3f, z:%.3f", eye.x, eye.y, eye.z);
+	auto focus = Dx12Constants::Instance().GetFocusPos();
+	ImGui::Text("FocusPos x:%.3f, y:%.3f, z:%.3f", focus.x, focus.y, focus.z);
+	for (int i = 0; i < pmdManagers.size(); ++i)
+	{
+		auto modelPos = pmdManagers[i]->GetPos();
+		std::string s = "modelPos[" + std::to_string(i) + "] x:%.3f, y:%.3f, z:%.3f";
+		ImGui::Text(s.c_str(), modelPos.x, modelPos.y, modelPos.z);
+	}
+	//ImGui::Bullet();
 	/*bool flag = false;
 	ImGui::Checkbox("flag", &flag);*/
 	//ImGui::ColorPicker4("ColorPicker4", clearColor);
@@ -812,10 +824,10 @@ Dx12Wrapper::Dx12Wrapper(HWND hwnd)
 	//pmdManagers.emplace_back(new PMDManager("model/hibiki/我那覇響v1_グラビアミズギ.pmd"));
 	//pmdManagers.emplace_back(new PMDManager("model/yayoi/やよいヘッド_カジュアル（体x0.96）改造.pmd"));
 	pmdManagers.emplace_back(new PMDManager("model/vocaloid/初音ミク.pmd"));
-	pmdManagers.emplace_back(new PMDManager("model/vocaloid/初音ミク.pmd"));
-	pmdManagers.emplace_back(new PMDManager("model/vocaloid/初音ミク.pmd"));
-	pmdManagers.emplace_back(new PMDManager("model/vocaloid/初音ミク.pmd"));
-	pmdManagers.emplace_back(new PMDManager("model/vocaloid/初音ミク.pmd"));
+	pmdManagers.emplace_back(new PMDManager("model/vocaloid/鏡音レン.pmd"));
+	pmdManagers.emplace_back(new PMDManager("model/vocaloid/巡音ルカ.pmd"));
+	pmdManagers.emplace_back(new PMDManager("model/vocaloid/鏡音リン.pmd"));
+	pmdManagers.emplace_back(new PMDManager("model/vocaloid/弱音ハク.pmd"));
 
 	// VMDの読み込み
 	//vmdLoaders.emplace_back(new VMDLoader(motion/ヤゴコロダンス.vmd");
@@ -837,7 +849,8 @@ Dx12Wrapper::Dx12Wrapper(HWND hwnd)
 
 	// 床
 	primitiveManager.reset(new PrimitiveManager());
-	plane.reset(primitiveManager->CreatePlane(DirectX::XMFLOAT3(0, 0, 0), 200, 200));
+	//plane.reset(primitiveManager->CreatePlane(DirectX::XMFLOAT3(0, 0, 0), 200, 200));
+	plane.reset(primitiveManager->CreatePlane(DirectX::XMFLOAT3(0, 0, 0), 0, 0));
 	// 床に張る画像
 	imageManager.reset(new ImageManager());
 	floorImgBuff = imageManager->Load("img/masaki.png");
@@ -979,7 +992,7 @@ void Dx12Wrapper::Update()
 	//m->world *= DirectX::XMMatrixRotationX(angle.y);
 
 	// 固定フレームにする
-	frame = ((GetTickCount64() - startTime) / 30) % maxFrame;
+	//frame = ((GetTickCount64() - startTime) / 30) % maxFrame;
 
 	// フレームを自分でいじる
 	if (keyState['P'] & 0x80)

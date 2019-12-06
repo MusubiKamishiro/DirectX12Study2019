@@ -29,6 +29,9 @@ private:
 
 	void CameraMove(const VMDCameraData& cameraData, const VMDCameraData& nextCameraData, const float& t);
 
+	DirectX::XMFLOAT3 eyePos;	// カメラの位置(視点)
+	DirectX::XMFLOAT3 focusPos;	// 焦点の位置(注視点)
+
 public:
 	static Dx12Constants& Instance();
 	~Dx12Constants();
@@ -37,5 +40,8 @@ public:
 
 	ID3D12DescriptorHeap* GetRgstDescriptorHeap()const;
 	WVP* GetMappedMatrix()const;
+
+	const DirectX::XMFLOAT3& GetEyePos()const;
+	const DirectX::XMFLOAT3& GetFocusPos()const;
 };
 
