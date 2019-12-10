@@ -76,7 +76,7 @@ float4 ps(Output output) : SV_TARGET
 	float3 matColor = toonDif.rgb * diffuse + specular + (mirror * 0.5f);
 
 	return float4(float3(brightness, brightness, brightness) * toonDif.rgb * texColor * diffuse
-		/** tex.Sample(smp, output.uv).rgb * sph.Sample(smp, spuv).rgb + spa.Sample(smp, spuv).rgb*/ + float3(texColor * mirror), 1.0f);
+		* tex.Sample(smp, output.uv).rgb * sph.Sample(smp, spuv).rgb + spa.Sample(smp, spuv).rgb + float3(texColor * mirror), 1.0f);
 
 	return float4(texColor * matColor * float3(brightness, brightness, brightness), 1.0f);
 }

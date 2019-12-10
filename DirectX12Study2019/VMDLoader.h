@@ -122,5 +122,6 @@ public:
 	const std::map<std::string, std::vector<SkinKeyFrames>>& GetSkinData()const;
 	const int GetMaxFrame()const;
 	const std::vector<VMDCameraData>& GetCameraData()const;
+	const int GetCameraNextPeriod(const int& nowFrame)const;
+	const int GetCameraBeforePeriod(const int& nowFrame)const;
 };
-

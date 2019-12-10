@@ -92,16 +92,16 @@ void Dx12Constants::CameraMove(const VMDCameraData& cameraData, const VMDCameraD
 	focusPos.y = (nextCameraData.location.y - cameraData.location.y) * t + cameraData.location.y;
 	focusPos.z = (nextCameraData.location.z - cameraData.location.z) * t + cameraData.location.z;
 	
-	DirectX::XMFLOAT3 rotation;	// カメラの角度
 	rotation.x = (nextCameraData.rotation.x - cameraData.rotation.x) * t + cameraData.rotation.x;
 	rotation.y = (nextCameraData.rotation.y - cameraData.rotation.y) * t + cameraData.rotation.y;
 	rotation.z = (nextCameraData.rotation.z - cameraData.rotation.z) * t + cameraData.rotation.z;
 	
 	float length = (nextCameraData.length - cameraData.length) * t + cameraData.length;	// 注視点からの距離
 
-	eyePos = DirectX::XMFLOAT3(sin(-rotation.y) * length, cos(rotation.x) * -length, cos(rotation.z) * length);	// カメラの位置(視点)
-	//eyePos = DirectX::XMFLOAT3(sin(rotation.y) * length, cos(rotation.x) * -length, cos(rotation.z) * length);	// カメラの位置(視点)
-
+	//eyePos = DirectX::XMFLOAT3(rotation.y * length, -rotation.x * length, rotation.z * length);	// カメラの位置(視点)
+	eyePos = DirectX::XMFLOAT3(sin(-rotation.y) * length + focusPos.x, sin(-rotation.x) * -length + focusPos.y, cos(rotation.z) * length + focusPos.z);	// カメラの位置(視点)
+	//eyePos = DirectX::XMFLOAT3(sin(-rotation.y) * length, cos(rotation.x) * -length, cos(rotation.z) * length);	// カメラの位置(視点)
+	
 	// 長さが0の時はlocationがカメラの座標になる
 	if (length == 0.00f)
 	{
@@ -137,7 +137,6 @@ Dx12Constants::~Dx12Constants()
 
 void Dx12Constants::Update(const std::vector<VMDCameraData>& cameraData, const int& frame)
 {
-	// ラムダ式
 	auto frameIt = std::find_if(cameraData.rbegin(), cameraData.rend(),
 		[frame](const VMDCameraData& c) {return c.frameNo <= frame; });	// 現在のフレームに近い前のフレーム
 
@@ -163,8 +162,6 @@ void Dx12Constants::Update(const std::vector<VMDCameraData>& cameraData, const i
 		
 		CameraMove(*frameIt, *nextFrameIt, t);
 	}
-
-
 }
 
 ID3D12DescriptorHeap* Dx12Constants::GetRgstDescriptorHeap() const
@@ -185,4 +182,9 @@ const DirectX::XMFLOAT3& Dx12Constants::GetEyePos() const
 const DirectX::XMFLOAT3& Dx12Constants::GetFocusPos() const
 {
 	return focusPos;
+}
+
+const DirectX::XMFLOAT3& Dx12Constants::GetRotation() const
+{
+	return rotation;
 }

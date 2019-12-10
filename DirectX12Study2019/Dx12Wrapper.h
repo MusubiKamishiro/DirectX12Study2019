@@ -139,7 +139,7 @@ private:
 	D3D12_RESOURCE_BARRIER BarrierDesc = {};	// バリア
 
 	// ルートシグネチャの作成
-	ID3DBlob* SerializeRootSignature();
+	ID3D12RootSignature* CreateRootSignature(ID3D12RootSignature* rootSignature, const std::vector<D3D12_ROOT_PARAMETER>& rootParam, const D3D12_TEXTURE_ADDRESS_MODE& addressMode);
 
 	// PMD関連
 	std::vector<std::shared_ptr<PMDManager>> pmdManagers;
@@ -174,6 +174,9 @@ private:
 	void ImGuiInit(HWND hwnd);
 	ID3D12DescriptorHeap* imguiHeap;
 	void ImGuiDraw();
+
+	bool motionPlayFlag = false;
+	bool motionReversePlayFlag = false;
 	
 public:
 	Dx12Wrapper(HWND hwnd);

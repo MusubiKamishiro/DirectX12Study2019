@@ -21,7 +21,6 @@
 #pragma comment(lib, "dxgi.lib")
 #pragma comment(lib, "d3dcompiler.lib")
 #pragma comment(lib, "DirectXTex.lib")
-#pragma comment(lib, "winmm.lib")
 #pragma comment(lib, "Effekseer.lib")
 #pragma comment(lib, "EffekseerRendererDX12.lib")
 #pragma comment(lib, "LLGI.lib")
@@ -165,35 +164,7 @@ void Dx12Wrapper::InitRootSignature()
 	rootParam[2].DescriptorTable.pDescriptorRanges = &descRange[3];	// 対応するレンジへのポインタ
 	rootParam[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
-
-	// サンプラの設定
-	D3D12_STATIC_SAMPLER_DESC samplerDesc = {};
-	samplerDesc.Filter = D3D12_FILTER_MIN_MAG_LINEAR_MIP_POINT;	// 特別なフィルタを使用しない
-	samplerDesc.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;		// 絵が繰り返される(U方向)
-	samplerDesc.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;		// 絵が繰り返される(V方向)
-	samplerDesc.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;		// 絵が繰り返される(W方向)
-	samplerDesc.MaxLOD = D3D12_FLOAT32_MAX;		// MIPMAP上限なし
-	samplerDesc.MinLOD = 0.0f;					// MIPMAP下限なし
-	samplerDesc.BorderColor = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;	// エッジのいろ(黒透明)
-	samplerDesc.ShaderRegister = 0;				// 使用するシェーダレジスタ(スロット)
-	samplerDesc.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;	// 全部のデータをシェーダに見せる
-	samplerDesc.RegisterSpace = 0;
-	samplerDesc.MaxAnisotropy = 0;
-	samplerDesc.ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
-
-	D3D12_ROOT_SIGNATURE_DESC rsd = {};
-	rsd.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
-	rsd.NumParameters = rootParam.size();
-	rsd.NumStaticSamplers = 1;
-	rsd.pParameters = &rootParam.front();
-	rsd.pStaticSamplers = &samplerDesc;
-
-	ID3DBlob* signature = nullptr;		// ルートシグネチャをつくるための材料
-	ID3DBlob* error = nullptr;			// エラー出た時の対処
-	auto result = D3D12SerializeRootSignature(&rsd, D3D_ROOT_SIGNATURE_VERSION_1, &signature, &error);
-
-	// ルートシグネチャの作成
-	result = Dx12Device::Instance().GetDevice()->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&rootSignature));
+	rootSignature = CreateRootSignature(rootSignature, rootParam, D3D12_TEXTURE_ADDRESS_MODE_WRAP);
 }
 
 void Dx12Wrapper::InitPipelineState()
@@ -341,7 +312,7 @@ void Dx12Wrapper::CreateShadowBuff()
 	auto wsize = Application::Instance().GetWindowSize();
 	auto size = max(wsize.width, wsize.height);
 	size_t bit = 0x8000000;
-	for (size_t i = 31; i >= 0; i--)
+	for (size_t i = 31; i >= 0; --i)
 	{
 		if (size & bit)
 		{
@@ -430,33 +401,7 @@ void Dx12Wrapper::InitShadowRootSignature()
 	shadowRootParam[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
 	shadowRootParam[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
-
-	D3D12_STATIC_SAMPLER_DESC samplerDesc = {};
-	samplerDesc.Filter = D3D12_FILTER_MIN_MAG_LINEAR_MIP_POINT;
-	samplerDesc.AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-	samplerDesc.AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-	samplerDesc.AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-	samplerDesc.MaxLOD = D3D12_FLOAT32_MAX;
-	samplerDesc.MinLOD = 0.0f;
-	samplerDesc.BorderColor = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
-	samplerDesc.ShaderRegister = 0;
-	samplerDesc.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-	samplerDesc.RegisterSpace = 0;
-	samplerDesc.MaxAnisotropy = 0;
-	samplerDesc.ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
-
-	D3D12_ROOT_SIGNATURE_DESC rsd = {};
-	rsd.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
-	rsd.NumParameters = shadowRootParam.size();
-	rsd.pParameters = &shadowRootParam.front();
-	rsd.NumStaticSamplers = 1;
-	rsd.pStaticSamplers = &samplerDesc;
-
-	ID3DBlob* rootSignatureBlob = nullptr;
-	ID3DBlob* error = nullptr;
-	auto result = D3D12SerializeRootSignature(&rsd, D3D_ROOT_SIGNATURE_VERSION_1, &rootSignatureBlob, &error);
-
-	result = Dx12Device::Instance().GetDevice()->CreateRootSignature(0, rootSignatureBlob->GetBufferPointer(), rootSignatureBlob->GetBufferSize(), IID_PPV_ARGS(&shadowRootSignature));
+	shadowRootSignature = CreateRootSignature(shadowRootSignature, shadowRootParam, D3D12_TEXTURE_ADDRESS_MODE_CLAMP);
 }
 
 void Dx12Wrapper::InitShadowPipelineState()
@@ -624,35 +569,7 @@ void Dx12Wrapper::InitLastRootSignature()
 	rootParam[0].DescriptorTable.pDescriptorRanges = &descRange[0];	// 対応するレンジへのポインタ
 	rootParam[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
-
-	// サンプラの設定
-	D3D12_STATIC_SAMPLER_DESC samplerDesc = {};
-	samplerDesc.Filter = D3D12_FILTER_MIN_MAG_LINEAR_MIP_POINT;	// 特別なフィルタを使用しない
-	samplerDesc.AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-	samplerDesc.AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-	samplerDesc.AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-	samplerDesc.MaxLOD = D3D12_FLOAT32_MAX;		// MIPMAP上限なし
-	samplerDesc.MinLOD = 0.0f;					// MIPMAP下限なし
-	samplerDesc.BorderColor = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;	// エッジのいろ(黒透明)
-	samplerDesc.ShaderRegister = 0;				// 使用するシェーダレジスタ(スロット)
-	samplerDesc.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;	// 全部のデータをシェーダに見せる
-	samplerDesc.RegisterSpace = 0;
-	samplerDesc.MaxAnisotropy = 0;
-	samplerDesc.ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
-
-	D3D12_ROOT_SIGNATURE_DESC rsd = {};
-	rsd.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
-	rsd.NumParameters = rootParam.size();
-	rsd.NumStaticSamplers = 1;
-	rsd.pParameters = &rootParam.front();
-	rsd.pStaticSamplers = &samplerDesc;
-
-	ID3DBlob* signature = nullptr;		// ルートシグネチャをつくるための材料
-	ID3DBlob* error = nullptr;			// エラー出た時の対処
-	auto result = D3D12SerializeRootSignature(&rsd, D3D_ROOT_SIGNATURE_VERSION_1, &signature, &error);
-
-	// ルートシグネチャの作成
-	result = Dx12Device::Instance().GetDevice()->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&lastRootSignature));
+	lastRootSignature = CreateRootSignature(lastRootSignature, rootParam, D3D12_TEXTURE_ADDRESS_MODE_CLAMP);
 }
 
 void Dx12Wrapper::InitLastPipelineState()
@@ -706,6 +623,44 @@ void Dx12Wrapper::InitLastShader()
 
 	InitLastRootSignature();
 	InitLastPipelineState();
+}
+
+ID3D12RootSignature* Dx12Wrapper::CreateRootSignature(ID3D12RootSignature* rootSignature, const std::vector<D3D12_ROOT_PARAMETER>& rootParam, const D3D12_TEXTURE_ADDRESS_MODE& addressMode)
+{
+	// サンプラの設定
+	D3D12_STATIC_SAMPLER_DESC samplerDesc = {};
+	samplerDesc.Filter = D3D12_FILTER_MIN_MAG_LINEAR_MIP_POINT;	// 特別なフィルタを使用しない
+	samplerDesc.AddressU = addressMode;			// 絵が繰り返される(U方向)
+	samplerDesc.AddressV = addressMode;			// 絵が繰り返される(V方向)
+	samplerDesc.AddressW = addressMode;			// 絵が繰り返される(W方向)
+	samplerDesc.MaxLOD = D3D12_FLOAT32_MAX;		// MIPMAP上限なし
+	samplerDesc.MinLOD = 0.0f;					// MIPMAP下限なし
+	samplerDesc.BorderColor = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;	// エッジのいろ(黒透明)
+	samplerDesc.ShaderRegister = 0;				// 使用するシェーダレジスタ(スロット)
+	samplerDesc.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;	// 全部のデータをシェーダに見せる
+	samplerDesc.RegisterSpace = 0;
+	samplerDesc.MaxAnisotropy = 0;
+	samplerDesc.ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
+
+	D3D12_ROOT_SIGNATURE_DESC rsd = {};
+	rsd.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
+	rsd.NumParameters = rootParam.size();
+	rsd.NumStaticSamplers = 1;
+	rsd.pParameters = &rootParam.front();
+	rsd.pStaticSamplers = &samplerDesc;
+
+	ID3DBlob* signature = nullptr;		// ルートシグネチャをつくるための材料
+	ID3DBlob* error = nullptr;			// エラー出た時の対処
+	auto result = D3D12SerializeRootSignature(&rsd, D3D_ROOT_SIGNATURE_VERSION_1, &signature, &error);
+
+	// ルートシグネチャの作成
+	result = Dx12Device::Instance().GetDevice()->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&rootSignature));
+
+	if (result == S_OK)
+	{
+		return rootSignature;
+	}
+	return nullptr;
 }
 
 void Dx12Wrapper::EffekseerInit()
@@ -779,21 +734,33 @@ void Dx12Wrapper::ImGuiDraw()
 	ImGui::NewFrame();
 	ImGui::SetNextWindowSize(ImVec2(400, 300));
 	ImGui::Begin("test");
-	ImGui::Text("yatta");
-	ImGui::Separator();		//区切り線
 	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-	ImGui::Text("NowFrame %d", frame);
+	ImGui::Separator();		//区切り線
+	ImGui::Checkbox("Motion Play", &motionPlayFlag);
+	ImGui::SameLine();		// 改行のキャンセル
+	ImGui::Checkbox("Motion ReversePlay", &motionReversePlayFlag);
+	ImGui::SliderInt("Now Frame", &frame, 0, maxFrame);
+	if (ImGui::Button("before"))
+	{
+		frame = vmdCamera->GetCameraBeforePeriod(frame);
+	}
+	ImGui::SameLine();
+	if (ImGui::Button("next"))
+	{
+		frame = vmdCamera->GetCameraNextPeriod(frame);
+	}
 	auto eye = Dx12Constants::Instance().GetEyePos();
 	ImGui::Text("CameraPos x:%.3f, y:%.3f, z:%.3f", eye.x, eye.y, eye.z);
 	auto focus = Dx12Constants::Instance().GetFocusPos();
 	ImGui::Text("FocusPos x:%.3f, y:%.3f, z:%.3f", focus.x, focus.y, focus.z);
+	auto rotation = Dx12Constants::Instance().GetRotation();
+	ImGui::Text("rotation x:%.3f, y:%.3f, z:%.3f", rotation.x, rotation.y, rotation.z);
 	for (int i = 0; i < pmdManagers.size(); ++i)
 	{
 		auto modelPos = pmdManagers[i]->GetPos();
 		std::string s = "modelPos[" + std::to_string(i) + "] x:%.3f, y:%.3f, z:%.3f";
 		ImGui::Text(s.c_str(), modelPos.x, modelPos.y, modelPos.z);
 	}
-	//ImGui::Bullet();
 	/*bool flag = false;
 	ImGui::Checkbox("flag", &flag);*/
 	//ImGui::ColorPicker4("ColorPicker4", clearColor);
@@ -824,7 +791,8 @@ Dx12Wrapper::Dx12Wrapper(HWND hwnd)
 	//pmdManagers.emplace_back(new PMDManager("model/hibiki/我那覇響v1_グラビアミズギ.pmd"));
 	//pmdManagers.emplace_back(new PMDManager("model/yayoi/やよいヘッド_カジュアル（体x0.96）改造.pmd"));
 	pmdManagers.emplace_back(new PMDManager("model/vocaloid/初音ミク.pmd"));
-	pmdManagers.emplace_back(new PMDManager("model/vocaloid/鏡音レン.pmd"));
+	//pmdManagers.emplace_back(new PMDManager("model/vocaloid/鏡音レン.pmd"));
+	pmdManagers.emplace_back(new PMDManager("model/hibiki/我那覇響v1_グラビアミズギ.pmd"));
 	pmdManagers.emplace_back(new PMDManager("model/vocaloid/巡音ルカ.pmd"));
 	pmdManagers.emplace_back(new PMDManager("model/vocaloid/鏡音リン.pmd"));
 	pmdManagers.emplace_back(new PMDManager("model/vocaloid/弱音ハク.pmd"));
@@ -991,19 +959,11 @@ void Dx12Wrapper::Update()
 	//m->world *= DirectX::XMMatrixRotationY(angle.x);	// 回転
 	//m->world *= DirectX::XMMatrixRotationX(angle.y);
 
-	// 固定フレームにする
-	//frame = ((GetTickCount64() - startTime) / 30) % maxFrame;
-
-	// フレームを自分でいじる
-	if (keyState['P'] & 0x80)
-	{
-		frame = 0;
-	}
-	if (keyState[VK_RIGHT] & 0x80)
+	if (motionPlayFlag)
 	{
 		++frame;
 	}
-	if (keyState[VK_LEFT] & 0x80)
+	if (motionReversePlayFlag)
 	{
 		--frame;
 	}

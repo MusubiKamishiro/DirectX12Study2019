@@ -84,11 +84,11 @@ void VMDLoader::Load(const std::string& filepath)
 	unsigned int selfshadowCount = 0;
 	fread(&selfshadowCount, sizeof(selfshadowCount), 1, fp);
 	// セルフシャドウデータ読み込み
-	for (auto& sddata : selfshadowdatas)
+	for (auto& ssdata : selfshadowdatas)
 	{
-		fread(&sddata.frameNo,	sizeof(sddata.frameNo),		1, fp);
-		fread(&sddata.mode,		sizeof(sddata.mode),		1, fp);
-		fread(&sddata.distance,	sizeof(sddata.distance),	1, fp);
+		fread(&ssdata.frameNo,	sizeof(ssdata.frameNo),		1, fp);
+		fread(&ssdata.mode,		sizeof(ssdata.mode),		1, fp);
+		fread(&ssdata.distance,	sizeof(ssdata.distance),	1, fp);
 	}
 
 	// 表示・IKデータ数読み込み
@@ -241,4 +241,28 @@ const int VMDLoader::GetMaxFrame() const
 const std::vector<VMDCameraData>& VMDLoader::GetCameraData() const
 {
 	return cameradatas;
+}
+
+const int VMDLoader::GetCameraNextPeriod(const int& nowFrame) const
+{
+	for (auto& camera : cameradatas)
+	{
+		if (camera.frameNo > nowFrame)
+		{
+			return camera.frameNo;
+		}
+	}
+	return 0;
+}
+
+const int VMDLoader::GetCameraBeforePeriod(const int& nowFrame) const
+{
+	for (int i = (cameradatas.size() - 1); i > 0; --i)
+	{
+		if (cameradatas[i].frameNo < nowFrame)
+		{
+			return cameradatas[i].frameNo;
+		}
+	}
+	return 0;
 }

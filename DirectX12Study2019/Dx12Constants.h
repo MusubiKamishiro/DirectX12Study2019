@@ -31,6 +31,7 @@ private:
 
 	DirectX::XMFLOAT3 eyePos;	// カメラの位置(視点)
 	DirectX::XMFLOAT3 focusPos;	// 焦点の位置(注視点)
+	DirectX::XMFLOAT3 rotation;	// カメラの角度
 
 public:
 	static Dx12Constants& Instance();
@@ -43,5 +44,6 @@ public:
 
 	const DirectX::XMFLOAT3& GetEyePos()const;
 	const DirectX::XMFLOAT3& GetFocusPos()const;
+	const DirectX::XMFLOAT3& GetRotation()const;
 };
 
