@@ -740,6 +740,8 @@ void Dx12Wrapper::ImGuiDraw()
 	ImGui::SameLine();		// 改行のキャンセル
 	ImGui::Checkbox("Motion ReversePlay", &motionReversePlayFlag);
 	ImGui::SliderInt("Now Frame", &frame, 0, maxFrame);
+	ImGui::Text("Camera Chapter");
+	ImGui::SameLine();
 	if (ImGui::Button("before"))
 	{
 		frame = vmdCamera->GetCameraBeforePeriod(frame);
@@ -761,8 +763,6 @@ void Dx12Wrapper::ImGuiDraw()
 		std::string s = "modelPos[" + std::to_string(i) + "] x:%.3f, y:%.3f, z:%.3f";
 		ImGui::Text(s.c_str(), modelPos.x, modelPos.y, modelPos.z);
 	}
-	/*bool flag = false;
-	ImGui::Checkbox("flag", &flag);*/
 	//ImGui::ColorPicker4("ColorPicker4", clearColor);
 	ImGui::End();
 	ImGui::Render();
@@ -800,15 +800,14 @@ Dx12Wrapper::Dx12Wrapper(HWND hwnd)
 	// VMDの読み込み
 	//vmdLoaders.emplace_back(new VMDLoader(motion/ヤゴコロダンス.vmd");
 	//vmdLoaders.emplace_back(new VMDLoader("motion/PBA_Solo.vmd");// Princess Be Ambitious!!
-	vmdLoaders.emplace_back(new VMDLoader("motion/Kimagure Mercy motion配布用/配布用Tda/Miku.vmd"));
-	vmdLoaders.emplace_back(new VMDLoader("motion/Kimagure Mercy motion配布用/配布用Tda/Teto.vmd"));
-	vmdLoaders.emplace_back(new VMDLoader("motion/Kimagure Mercy motion配布用/配布用Tda/Luka.vmd"));
-	vmdLoaders.emplace_back(new VMDLoader("motion/Kimagure Mercy motion配布用/配布用Tda/Rin.vmd"));
-	vmdLoaders.emplace_back(new VMDLoader("motion/Kimagure Mercy motion配布用/配布用Tda/Haku.vmd"));
+	vmdLoaders.emplace_back(new VMDLoader("motion/KimagureMercy/Tda/Miku.vmd"));
+	vmdLoaders.emplace_back(new VMDLoader("motion/KimagureMercy/Tda/Teto.vmd"));
+	vmdLoaders.emplace_back(new VMDLoader("motion/KimagureMercy/Tda/Luka.vmd"));
+	vmdLoaders.emplace_back(new VMDLoader("motion/KimagureMercy/Tda/Rin.vmd"));
+	vmdLoaders.emplace_back(new VMDLoader("motion/KimagureMercy/Tda/Haku.vmd"));
 
 	// VMD(カメラ)の読み込み
-	cameraPath = "motion/camera.vmd";
-	vmdCamera.reset(new VMDLoader(cameraPath));
+	vmdCamera.reset(new VMDLoader("motion/KimagureMercy/camera.vmd"));
 
 	CreateDepthBuff();
 	

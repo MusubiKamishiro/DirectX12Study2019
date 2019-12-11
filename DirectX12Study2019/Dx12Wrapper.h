@@ -149,7 +149,6 @@ private:
 
 	// ƒJƒƒ‰VMD
 	std::shared_ptr<VMDLoader> vmdCamera;
-	std::string cameraPath;
 
 	unsigned int startTime;
 	int frame = 0;

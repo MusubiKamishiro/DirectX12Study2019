@@ -87,28 +87,26 @@ Dx12Constants::Dx12Constants()
 
 void Dx12Constants::CameraMove(const VMDCameraData& cameraData, const VMDCameraData& nextCameraData, const float& t)
 {
-	// カメラの設定
+	// 注視点からの距離
+	float length = (nextCameraData.length - cameraData.length) * t + cameraData.length;
+
 	focusPos.x = (nextCameraData.location.x - cameraData.location.x) * t + cameraData.location.x;
 	focusPos.y = (nextCameraData.location.y - cameraData.location.y) * t + cameraData.location.y;
 	focusPos.z = (nextCameraData.location.z - cameraData.location.z) * t + cameraData.location.z;
-	
+
 	rotation.x = (nextCameraData.rotation.x - cameraData.rotation.x) * t + cameraData.rotation.x;
 	rotation.y = (nextCameraData.rotation.y - cameraData.rotation.y) * t + cameraData.rotation.y;
 	rotation.z = (nextCameraData.rotation.z - cameraData.rotation.z) * t + cameraData.rotation.z;
-	
-	float length = (nextCameraData.length - cameraData.length) * t + cameraData.length;	// 注視点からの距離
 
-	//eyePos = DirectX::XMFLOAT3(rotation.y * length, -rotation.x * length, rotation.z * length);	// カメラの位置(視点)
-	eyePos = DirectX::XMFLOAT3(sin(-rotation.y) * length + focusPos.x, sin(-rotation.x) * -length + focusPos.y, cos(rotation.z) * length + focusPos.z);	// カメラの位置(視点)
-	//eyePos = DirectX::XMFLOAT3(sin(-rotation.y) * length, cos(rotation.x) * -length, cos(rotation.z) * length);	// カメラの位置(視点)
-	
-	// 長さが0の時はlocationがカメラの座標になる
-	if (length == 0.00f)
+	eyePos = DirectX::XMFLOAT3(sin(-rotation.y) * length + focusPos.x, sin(-rotation.x) * -length + focusPos.y, length + focusPos.z);
+
+	// 注視点からの距離がマイナスの場合、MMDの起動時の距離である45で補正している
+	if (length >= 0)
 	{
-		focusPos.z = 0;
+		focusPos.z += 45.f;
 	}
-	auto up = DirectX::XMFLOAT3(0.0f, 1.0f, 0.0f);	// カメラの上方向(通常は(0.0f, 1.0f, 0.0f))	// カメラを固定するためのもの
 
+	auto up = DirectX::XMFLOAT3(0.0f, 1.0f, 0.0f);
 	DirectX::XMMATRIX camera = DirectX::XMMatrixLookAtLH(XMLoadFloat3(&eyePos), XMLoadFloat3(&focusPos), XMLoadFloat3(&up));
 	
 	auto wsize = Application::Instance().GetWindowSize();	// 画面サイズ
