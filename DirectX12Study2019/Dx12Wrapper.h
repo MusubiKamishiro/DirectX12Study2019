@@ -75,11 +75,9 @@ private:
 	// 命令のクリア
 	void ClearCmd(ID3D12PipelineState* pipelinestate, ID3D12RootSignature* rootsignature);
 
-	// バリアの解除
-	void UnlockBarrier(ID3D12Resource* buffer, const D3D12_RESOURCE_STATES& before, const D3D12_RESOURCE_STATES& after);
-	// バリアのセット
-	void SetBarrier(const D3D12_RESOURCE_STATES& before, const D3D12_RESOURCE_STATES& after);
-
+	// バリアの解除,セット
+	void Barrier(ID3D12Resource* buffer, const D3D12_RESOURCE_STATES& before, const D3D12_RESOURCE_STATES& after);
+	
 	// コマンドキューに投げる
 	void ExecuteCmd();
 	// 待ち
@@ -108,7 +106,7 @@ private:
 	void CreateFirstPassBuff();
 	ID3D12DescriptorHeap* heapFor1stPassRTV;
 	ID3D12DescriptorHeap* heapFor1stPassSRV;
-	ID3D12Resource* firstPassBuff;
+	std::array<ID3D12Resource*, 2> firstPassBuff;
 
 	// スクリーン(ペラポリ)テクスチャ作成
 	void CreateScreenTexture();
@@ -136,8 +134,6 @@ private:
 	UINT64 fenceValue = 0;
 	UINT bbIdx = 0;
 	
-	D3D12_RESOURCE_BARRIER BarrierDesc = {};	// バリア
-
 	// ルートシグネチャの作成
 	ID3D12RootSignature* CreateRootSignature(ID3D12RootSignature* rootSignature, const std::vector<D3D12_ROOT_PARAMETER>& rootParam, const D3D12_TEXTURE_ADDRESS_MODE& addressMode);
 

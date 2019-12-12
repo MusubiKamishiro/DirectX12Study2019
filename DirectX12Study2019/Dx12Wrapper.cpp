@@ -196,8 +196,9 @@ void Dx12Wrapper::InitPipelineState()
 	gpsDesc.PS = CD3DX12_SHADER_BYTECODE(pixelShader);		// ピクセルシェーダ
 
 	// レンダターゲット
-	gpsDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;		// このターゲット数と設定するフォーマット数は
-	gpsDesc.NumRenderTargets = 1;							// 一致させておく
+	gpsDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+	gpsDesc.RTVFormats[1] = DXGI_FORMAT_R8G8B8A8_UNORM;		// このターゲット数と設定するフォーマット数は
+	gpsDesc.NumRenderTargets = 2;							// 一致させておく
 
 	// 深度ステンシル
 	gpsDesc.DepthStencilState.DepthEnable = true;
@@ -270,8 +271,9 @@ void Dx12Wrapper::ClearCmd(ID3D12PipelineState* pipelinestate, ID3D12RootSignatu
 	cmdList->SetGraphicsRootSignature(rootsignature);
 }
 
-void Dx12Wrapper::UnlockBarrier(ID3D12Resource* buffer, const D3D12_RESOURCE_STATES& before, const D3D12_RESOURCE_STATES& after)
+void Dx12Wrapper::Barrier(ID3D12Resource* buffer, const D3D12_RESOURCE_STATES& before, const D3D12_RESOURCE_STATES& after)
 {
+	D3D12_RESOURCE_BARRIER BarrierDesc = {};	// バリア
 	BarrierDesc.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
 	BarrierDesc.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
 	BarrierDesc.Transition.pResource = buffer;
@@ -280,14 +282,6 @@ void Dx12Wrapper::UnlockBarrier(ID3D12Resource* buffer, const D3D12_RESOURCE_STA
 	BarrierDesc.Transition.StateAfter = after;
 	
 	// バリアを解除
-	cmdList->ResourceBarrier(1, &BarrierDesc);
-}
-
-void Dx12Wrapper::SetBarrier(const D3D12_RESOURCE_STATES& before, const D3D12_RESOURCE_STATES& after)
-{
-	BarrierDesc.Transition.StateBefore = before;
-	BarrierDesc.Transition.StateAfter = after;
-	// バリアをセット
 	cmdList->ResourceBarrier(1, &BarrierDesc);
 }
 
@@ -473,7 +467,7 @@ void Dx12Wrapper::CreateFirstPassBuff()
 	descriptorHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
 	descriptorHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
 	descriptorHeapDesc.NodeMask = 0;
-	descriptorHeapDesc.NumDescriptors = 1;
+	descriptorHeapDesc.NumDescriptors = 2;
 	auto result = dev->CreateDescriptorHeap(&descriptorHeapDesc, IID_PPV_ARGS(&heapFor1stPassRTV));
 
 	descriptorHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
@@ -507,11 +501,19 @@ void Dx12Wrapper::CreateFirstPassBuff()
 	clearValue.Color[2] = 1.0f;
 	clearValue.Color[3] = 1.0f;
 	clearValue.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-	result = dev->CreateCommittedResource(&heapprop, D3D12_HEAP_FLAG_NONE, &resDesc, 
-		D3D12_RESOURCE_STATE_COPY_DEST, &clearValue, IID_PPV_ARGS(&firstPassBuff));
+	for (auto& buff : firstPassBuff)
+	{
+		result = dev->CreateCommittedResource(&heapprop, D3D12_HEAP_FLAG_NONE, &resDesc,
+			D3D12_RESOURCE_STATE_COPY_DEST, &clearValue, IID_PPV_ARGS(&buff));
+	}
 
+	auto handle = heapFor1stPassRTV->GetCPUDescriptorHandleForHeapStart();
 	// ビューの作成
-	dev->CreateRenderTargetView(firstPassBuff, nullptr, heapFor1stPassRTV->GetCPUDescriptorHandleForHeapStart());
+	for (auto& buff : firstPassBuff)
+	{
+		dev->CreateRenderTargetView(buff, nullptr, handle);
+		handle.ptr += dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+	}
 
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
 	srvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
@@ -519,7 +521,12 @@ void Dx12Wrapper::CreateFirstPassBuff()
 	srvDesc.Texture2D.MipLevels = 1;
 	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 
-	dev->CreateShaderResourceView(firstPassBuff, &srvDesc, heapFor1stPassSRV->GetCPUDescriptorHandleForHeapStart());
+	handle = heapFor1stPassSRV->GetCPUDescriptorHandleForHeapStart();
+	for (auto& buff : firstPassBuff)
+	{
+		dev->CreateShaderResourceView(buff, &srvDesc, handle);
+		handle.ptr += dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	}
 }
 
 void Dx12Wrapper::CreateScreenTexture()
@@ -556,10 +563,10 @@ void Dx12Wrapper::InitLastRootSignature()
 {
 	std::vector<D3D12_DESCRIPTOR_RANGE> descRange;
 	descRange.resize(1);
-	// "t0" テクスチャ
+	// "t0,t1" テクスチャと法線情報
 	descRange[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
 	descRange[0].BaseShaderRegister = 0;	// レジスタ番号
-	descRange[0].NumDescriptors = 1;		// 1回で読む数
+	descRange[0].NumDescriptors = 2;		// 1回で読む数
 	descRange[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
 	std::vector<D3D12_ROOT_PARAMETER> rootParam;
@@ -870,7 +877,10 @@ Dx12Wrapper::~Dx12Wrapper()
 	rtvDescriptorHeap->Release();
 	heapFor1stPassRTV->Release();
 	heapFor1stPassSRV->Release();
-	firstPassBuff->Release();
+	for (auto& buff : firstPassBuff)
+	{
+		buff->Release();
+	}
 	lastPipelineState->Release();
 	lastRootSignature->Release();
 
@@ -915,48 +925,19 @@ void Dx12Wrapper::Update()
 
 	if (GetKeyboardState(keyState))
 	{
-		// 平行移動
-		if (keyState[VK_UP] & 0x80)	// 0b00000000
+		// Effekseer
+		if (keyState[VK_SPACE] & 0x80)
 		{
-			pos.y = 0.05f;
-		}
-		if (keyState[VK_DOWN] & 0x80)
-		{
-			pos.y = -0.05f;
-		}
-		if (keyState['Z'] & 0x80)
-		{
-			pos.z = 0.05f;
-		}
-		if (keyState['X'] & 0x80)
-		{
-			pos.z = -0.05f;
-		}
-
-		// 回転
-		if (keyState['A'] & 0x80)
-		{
-			angle.x = 0.01f;
-		}
-		if (keyState['D'] & 0x80)
-		{
-			angle.x = -0.01f;
-		}
-		if (keyState['W'] & 0x80)
-		{
-			angle.y = 0.01f;
-		}
-		if (keyState['S'] & 0x80)
-		{
-			angle.y = -0.01f;
+			if (efkManager->Exists(efkHandle))
+			{
+				efkManager->StopEffect(efkHandle);
+			}
+			efkHandle = efkManager->Play(effect, Effekseer::Vector3D(0, 0, 0));
 		}
 	}
 	
 	Dx12Constants::Instance().Update(vmdCamera->GetCameraData(), frame);
-	//auto m = Dx12Constants::Instance().GetMappedMatrix();
-	//m->world *= DirectX::XMMatrixTranslation(pos.x, pos.y, pos.z);
-	//m->world *= DirectX::XMMatrixRotationY(angle.x);	// 回転
-	//m->world *= DirectX::XMMatrixRotationX(angle.y);
+
 
 	if (motionPlayFlag)
 	{
@@ -979,16 +960,6 @@ void Dx12Wrapper::Update()
 	{
 		pmdManagers[i]->Update(vmdLoaders[i]->GetAnimationData(), vmdLoaders[i]->GetSkinData(), frame);
 	}
-
-	// Effekseer
-	if (keyState[VK_SPACE] & 0x80)
-	{
-		if (efkManager->Exists(efkHandle))
-		{
-			efkManager->StopEffect(efkHandle);
-		}
-		efkHandle = efkManager->Play(effect, Effekseer::Vector3D(0, 0, 0));
-	}
 }
 
 void Dx12Wrapper::Draw()
@@ -1006,7 +977,7 @@ void Dx12Wrapper::Draw()
 	cmdList->ClearDepthStencilView(sdsvh, D3D12_CLEAR_FLAG_DEPTH, 1.f, 0, 0, nullptr);
 
 	// バリアを解除
-	UnlockBarrier(shadowBuff, D3D12_RESOURCE_STATE_DEPTH_READ, D3D12_RESOURCE_STATE_DEPTH_WRITE);
+	Barrier(shadowBuff, D3D12_RESOURCE_STATE_DEPTH_READ, D3D12_RESOURCE_STATE_DEPTH_WRITE);
 
 	for (auto& pmd : pmdManagers)
 	{
@@ -1014,7 +985,7 @@ void Dx12Wrapper::Draw()
 	}
 
 	// バリアを張る
-	SetBarrier(D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_PRESENT);
+	Barrier(shadowBuff, D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_PRESENT);
 
 	cmdList->Close();
 	ExecuteCmd();
@@ -1029,15 +1000,25 @@ void Dx12Wrapper::Draw()
 	cmdList->RSSetScissorRects(1, &scissorRect);
 
 	auto dev = Dx12Device::Instance().GetDevice();
-	auto heapStart = heapFor1stPassRTV->GetCPUDescriptorHandleForHeapStart();
-	cmdList->OMSetRenderTargets(1, &heapStart, false, &dsvHeap->GetCPUDescriptorHandleForHeapStart());		// レンダーターゲット設定
+	auto handle = heapFor1stPassRTV->GetCPUDescriptorHandleForHeapStart();
+	handle.ptr += dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+	D3D12_CPU_DESCRIPTOR_HANDLE rtvs[2] = {
+		heapFor1stPassRTV->GetCPUDescriptorHandleForHeapStart() ,handle
+	};
+	cmdList->OMSetRenderTargets(2, rtvs, false, &dsvHeap->GetCPUDescriptorHandleForHeapStart());		// レンダーターゲット設定
 	cmdList->ClearDepthStencilView(dsvHeap->GetCPUDescriptorHandleForHeapStart(), D3D12_CLEAR_FLAG_DEPTH, 1.f, 0, 0, nullptr);	// 深度バッファのクリア
 
 	// バリアの解除(ここから書き込みが始まる)
-	UnlockBarrier(firstPassBuff, D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
+	for (auto& buff : firstPassBuff)
+	{
+		Barrier(buff, D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
+	}
 	// 画面のクリア(これも書き込みに入る)
 	float clearColor[] = { 1.0f, 1.0f, 1.0f, 1.0f };	// クリアカラー設定
-	cmdList->ClearRenderTargetView(heapStart, clearColor, 0, nullptr);
+	for (auto& rtv : rtvs)
+	{
+		cmdList->ClearRenderTargetView(rtv, clearColor, 0, nullptr);
+	}
 	// モデルの描画
 	for (auto& pmd : pmdManagers)
 	{
@@ -1064,7 +1045,10 @@ void Dx12Wrapper::Draw()
 	EffekseerRendererDX12::EndCommandList(efkCmdList);
 	
 	// バリアのセット
-	SetBarrier(D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
+	for (auto& buff : firstPassBuff)
+	{
+		Barrier(buff, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
+	}
 
 	cmdList->Close();	// クローズ
 	ExecuteCmd();
@@ -1078,14 +1062,14 @@ void Dx12Wrapper::Draw()
 	cmdList->RSSetViewports(1, &viewport);
 	cmdList->RSSetScissorRects(1, &scissorRect);
 
-	heapStart = rtvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
+	auto heapStart = rtvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
 	bbIdx = swapChain->GetCurrentBackBufferIndex();		// バックバッファインデックスを調べる
 	heapStart.ptr += bbIdx * dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 	cmdList->OMSetRenderTargets(1, &heapStart, false, nullptr);		// レンダーターゲット設定
 	cmdList->ClearDepthStencilView(dsvHeap->GetCPUDescriptorHandleForHeapStart(), D3D12_CLEAR_FLAG_DEPTH, 1.f, 0, 0, nullptr);	// 深度バッファのクリア
 
 	// バリアの解除(ここから書き込みが始まる)
-	UnlockBarrier(backBuffers[bbIdx], D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
+	Barrier(backBuffers[bbIdx], D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
 	// 画面のクリア(これも書き込みに入る)
 	cmdList->ClearRenderTargetView(heapStart, clearColor, 0, nullptr);
 
@@ -1100,14 +1084,8 @@ void Dx12Wrapper::Draw()
 	// imgui描画
 	ImGuiDraw();
 	
-	//////
-	//cmdList->SetDescriptorHeaps(1, &shadowSrvHeap);
-	//cmdList->SetGraphicsRootDescriptorTable(0, shadowSrvHeap->GetGPUDescriptorHandleForHeapStart());
-	//cmdList->DrawInstanced(3, 1, 0, 0);
-	//////
-
 	// バリアのセット
-	SetBarrier(D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
+	Barrier(backBuffers[bbIdx], D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
 
 	cmdList->Close();	// クローズ
 	ExecuteCmd();

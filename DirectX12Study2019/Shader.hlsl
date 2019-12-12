@@ -57,8 +57,13 @@ Output vs(float4 pos : POSITION, float4 normal : NORMAL, float2 uv : TEXCOORD, m
 }
 
 
-// ピクセルシェーダ
-float4 ps(Output output) : SV_TARGET
+struct PixelOutput
+{
+	float4 color	: SV_TARGET0;	//カラー値を出力
+	float4 normal	: SV_TARGET1;	//法線を出力
+};
+
+PixelOutput ps(Output output)
 {
 	// 座標系をあわせている
 	float2 spuv = ((float2(1, -1) + output.normal.xy) * float2(0.5f, -0.5f));
@@ -75,8 +80,11 @@ float4 ps(Output output) : SV_TARGET
 	float3 texColor = tex.Sample(smp, output.uv) * sph.Sample(smp, spuv).rgb + spa.Sample(smp, spuv).rgb;;
 	float3 matColor = toonDif.rgb * diffuse + specular + (mirror * 0.5f);
 
-	return float4(float3(brightness, brightness, brightness) * toonDif.rgb * texColor * diffuse
+	PixelOutput po;
+	po.color = float4(float3(brightness, brightness, brightness) * toonDif.rgb * texColor * diffuse
 		* tex.Sample(smp, output.uv).rgb * sph.Sample(smp, spuv).rgb + spa.Sample(smp, spuv).rgb + float3(texColor * mirror), 1.0f);
 
-	return float4(texColor * matColor * float3(brightness, brightness, brightness), 1.0f);
+	po.normal.rgb = float3((output.normal.xyz + 1.0f) / 2.0f);
+	po.normal.a = 1;
+	return po;
 }
