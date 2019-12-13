@@ -197,8 +197,9 @@ void Dx12Wrapper::InitPipelineState()
 
 	// レンダターゲット
 	gpsDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
-	gpsDesc.RTVFormats[1] = DXGI_FORMAT_R8G8B8A8_UNORM;		// このターゲット数と設定するフォーマット数は
-	gpsDesc.NumRenderTargets = 2;							// 一致させておく
+	gpsDesc.RTVFormats[1] = DXGI_FORMAT_R8G8B8A8_UNORM;
+	gpsDesc.RTVFormats[2] = DXGI_FORMAT_R8G8B8A8_UNORM;		// このターゲット数と設定するフォーマット数は
+	gpsDesc.NumRenderTargets = 3;							// 一致させておく
 
 	// 深度ステンシル
 	gpsDesc.DepthStencilState.DepthEnable = true;
@@ -467,7 +468,7 @@ void Dx12Wrapper::CreateFirstPassBuff()
 	descriptorHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
 	descriptorHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
 	descriptorHeapDesc.NodeMask = 0;
-	descriptorHeapDesc.NumDescriptors = 2;
+	descriptorHeapDesc.NumDescriptors = 3;
 	auto result = dev->CreateDescriptorHeap(&descriptorHeapDesc, IID_PPV_ARGS(&heapFor1stPassRTV));
 
 	descriptorHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
@@ -506,6 +507,14 @@ void Dx12Wrapper::CreateFirstPassBuff()
 		result = dev->CreateCommittedResource(&heapprop, D3D12_HEAP_FLAG_NONE, &resDesc,
 			D3D12_RESOURCE_STATE_COPY_DEST, &clearValue, IID_PPV_ARGS(&buff));
 	}
+	for (auto& buff : bloomBuff)
+	{
+		result = dev->CreateCommittedResource(&heapprop, D3D12_HEAP_FLAG_NONE, &resDesc,
+			D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, &clearValue, IID_PPV_ARGS(&buff));
+
+		resDesc.Width = resDesc.Width / 2;
+		resDesc.Height = resDesc.Height / 2;
+	}
 
 	auto handle = heapFor1stPassRTV->GetCPUDescriptorHandleForHeapStart();
 	// ビューの作成
@@ -514,6 +523,7 @@ void Dx12Wrapper::CreateFirstPassBuff()
 		dev->CreateRenderTargetView(buff, nullptr, handle);
 		handle.ptr += dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 	}
+	dev->CreateRenderTargetView(bloomBuff[0], nullptr, handle);
 
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
 	srvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
@@ -527,6 +537,7 @@ void Dx12Wrapper::CreateFirstPassBuff()
 		dev->CreateShaderResourceView(buff, &srvDesc, handle);
 		handle.ptr += dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 	}
+	dev->CreateShaderResourceView(bloomBuff[0], &srvDesc, handle);
 }
 
 void Dx12Wrapper::CreateScreenTexture()
@@ -563,10 +574,10 @@ void Dx12Wrapper::InitLastRootSignature()
 {
 	std::vector<D3D12_DESCRIPTOR_RANGE> descRange;
 	descRange.resize(1);
-	// "t0,t1" テクスチャと法線情報
+	// "t0,t1,t2" テクスチャ, 法線情報, 高輝度成分
 	descRange[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
 	descRange[0].BaseShaderRegister = 0;	// レジスタ番号
-	descRange[0].NumDescriptors = 2;		// 1回で読む数
+	descRange[0].NumDescriptors = 3;		// 1回で読む数
 	descRange[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
 	std::vector<D3D12_ROOT_PARAMETER> rootParam;
@@ -889,6 +900,10 @@ Dx12Wrapper::~Dx12Wrapper()
 	{
 		backBuffer->Release();
 	}
+	for (auto& buff : bloomBuff)
+	{
+		buff->Release();
+	}
 
 	depthBuff->Release();
 	dsvHeap->Release();
@@ -1000,16 +1015,23 @@ void Dx12Wrapper::Draw()
 	cmdList->RSSetScissorRects(1, &scissorRect);
 
 	auto dev = Dx12Device::Instance().GetDevice();
-	auto handle = heapFor1stPassRTV->GetCPUDescriptorHandleForHeapStart();
-	handle.ptr += dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-	D3D12_CPU_DESCRIPTOR_HANDLE rtvs[2] = {
-		heapFor1stPassRTV->GetCPUDescriptorHandleForHeapStart() ,handle
-	};
-	cmdList->OMSetRenderTargets(2, rtvs, false, &dsvHeap->GetCPUDescriptorHandleForHeapStart());		// レンダーターゲット設定
+	D3D12_CPU_DESCRIPTOR_HANDLE handle = heapFor1stPassRTV->GetCPUDescriptorHandleForHeapStart();
+	auto incSize = dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+	std::array<D3D12_CPU_DESCRIPTOR_HANDLE, 3> rtvs;
+	for (auto& rtv : rtvs)
+	{
+		rtv = handle;
+		handle.ptr += incSize;
+	}
+	cmdList->OMSetRenderTargets(3, rtvs.data(), false, &dsvHeap->GetCPUDescriptorHandleForHeapStart());		// レンダーターゲット設定
 	cmdList->ClearDepthStencilView(dsvHeap->GetCPUDescriptorHandleForHeapStart(), D3D12_CLEAR_FLAG_DEPTH, 1.f, 0, 0, nullptr);	// 深度バッファのクリア
 
 	// バリアの解除(ここから書き込みが始まる)
 	for (auto& buff : firstPassBuff)
+	{
+		Barrier(buff, D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
+	}
+	for (auto& buff : bloomBuff)
 	{
 		Barrier(buff, D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
 	}
@@ -1046,6 +1068,10 @@ void Dx12Wrapper::Draw()
 	
 	// バリアのセット
 	for (auto& buff : firstPassBuff)
+	{
+		Barrier(buff, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
+	}
+	for (auto& buff : bloomBuff)
 	{
 		Barrier(buff, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
 	}

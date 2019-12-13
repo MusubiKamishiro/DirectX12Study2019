@@ -107,6 +107,8 @@ private:
 	ID3D12DescriptorHeap* heapFor1stPassRTV;
 	ID3D12DescriptorHeap* heapFor1stPassSRV;
 	std::array<ID3D12Resource*, 2> firstPassBuff;
+	// ブルーム用バッファ
+	std::array<ID3D12Resource*, 2> bloomBuff;
 
 	// スクリーン(ペラポリ)テクスチャ作成
 	void CreateScreenTexture();

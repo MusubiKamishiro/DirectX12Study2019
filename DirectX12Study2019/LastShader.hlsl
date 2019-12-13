@@ -2,6 +2,8 @@
 Texture2D<float4> tex : register(t0);
 // テクスチャ(1番)
 Texture2D<float4> normalTex : register(t1);
+// テクスチャ(2番)
+Texture2D<float4> highLim : register(t2);
 // サンプラ(0番)
 SamplerState smp : register(s0);
 
@@ -30,7 +32,11 @@ float4 ps(Output output) : SV_TARGET
 	//法線出力
 	if (output.uv.x < 0.2 && output.uv.y < 0.2)
 	{
-		return normalTex.Sample(smp, (output.uv /*- float2(0, 0.4)*/) * 5);
+		return normalTex.Sample(smp, (output.uv) * 5);
+	}
+	else if (output.uv.x < 0.2 && output.uv.y < 0.4)
+	{
+		return highLim.Sample(smp, (output.uv - float2(0, 0.2)) * 5);
 	}
 	if ((output.uv.x + output.uv.y) < 1.0f)
 	{

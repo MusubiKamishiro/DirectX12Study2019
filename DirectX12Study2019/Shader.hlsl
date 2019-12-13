@@ -59,8 +59,9 @@ Output vs(float4 pos : POSITION, float4 normal : NORMAL, float2 uv : TEXCOORD, m
 
 struct PixelOutput
 {
-	float4 color	: SV_TARGET0;	//カラー値を出力
-	float4 normal	: SV_TARGET1;	//法線を出力
+	float4 color	: SV_TARGET0;	// カラー値を出力
+	float4 normal	: SV_TARGET1;	// 法線を出力
+	float4 highLum	: SV_TARGET2;	// 高輝度(High Luminance)
 };
 
 PixelOutput ps(Output output)
@@ -80,11 +81,14 @@ PixelOutput ps(Output output)
 	float3 texColor = tex.Sample(smp, output.uv) * sph.Sample(smp, spuv).rgb + spa.Sample(smp, spuv).rgb;;
 	float3 matColor = toonDif.rgb * diffuse + specular + (mirror * 0.5f);
 
-	PixelOutput po;
-	po.color = float4(float3(brightness, brightness, brightness) * toonDif.rgb * texColor * diffuse
+	float4 ret = float4(float3(brightness, brightness, brightness) * toonDif.rgb * texColor * diffuse
 		* tex.Sample(smp, output.uv).rgb * sph.Sample(smp, spuv).rgb + spa.Sample(smp, spuv).rgb + float3(texColor * mirror), 1.0f);
+	
+	PixelOutput po;
+	po.color = ret;
 
 	po.normal.rgb = float3((output.normal.xyz + 1.0f) / 2.0f);
 	po.normal.a = 1;
+	po.highLum = (ret > 1.0f);
 	return po;
 }
