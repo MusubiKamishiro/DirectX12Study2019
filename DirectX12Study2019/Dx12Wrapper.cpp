@@ -7,6 +7,9 @@
 #include "imgui/imgui_impl_dx12.h"
 #include "imgui/imgui_impl_win32.h"
 
+#include <SpriteFont.h>				// 文字列を表示するのに必要なもの
+#include <ResourceUploadBatch.h>	// DXTK系列のリソースを使用するのに必要なもの
+
 #include "Application.h"
 #include "Dx12Device.h"
 #include "Dx12Constants.h"
@@ -753,7 +756,7 @@ void Dx12Wrapper::ImGuiDraw()
 	ImGui::SetNextWindowSize(ImVec2(400, 300));
 	ImGui::Begin("test");
 	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-	ImGui::Separator();		//区切り線
+	ImGui::Separator();		// 区切り線
 	ImGui::Checkbox("Motion Play", &motionPlayFlag);
 	ImGui::SameLine();		// 改行のキャンセル
 	ImGui::Checkbox("Motion ReversePlay", &motionReversePlayFlag);
@@ -835,7 +838,7 @@ Dx12Wrapper::Dx12Wrapper(HWND hwnd)
 	// 床
 	primitiveManager.reset(new PrimitiveManager());
 	//plane.reset(primitiveManager->CreatePlane(DirectX::XMFLOAT3(0, 0, 0), 200, 200));
-	plane.reset(primitiveManager->CreatePlane(DirectX::XMFLOAT3(0, 0, 0), 0, 0));
+	plane.reset(primitiveManager->CreatePlane(DirectX::XMFLOAT3(0, 0, 0), 300, 300));
 	// 床に張る画像
 	imageManager.reset(new ImageManager());
 	floorImgBuff = imageManager->Load("img/masaki.png");
@@ -934,9 +937,6 @@ void Dx12Wrapper::Update()
 {
 	// 入力関連
 	unsigned char keyState[256] = {};
-
-	Vector3 pos = {};
-	Vector3 angle = {};
 
 	if (GetKeyboardState(keyState))
 	{

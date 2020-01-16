@@ -88,7 +88,7 @@ PixelOutput ps(Output output)
 	po.color = ret;
 
 	po.normal.rgb = float3((output.normal.xyz + 1.0f) / 2.0f);
-	po.normal.a = 1;
+	po.normal.a = 0;
 	po.highLum = (ret > 1.0f);
 	return po;
 }

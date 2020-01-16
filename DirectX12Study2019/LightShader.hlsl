@@ -6,7 +6,7 @@ cbuffer camera : register(b0)
 	matrix world;
 	matrix viewProj;
 	matrix wvp;			// 合成済み
-	matrix lightVP;		// ﾗｲﾄﾋﾞｭｰﾌﾟﾛｼﾞｪｸｼｮﾝ
+	matrix lightVP;		// ライトビュープロジェクション
 	float4 eye;			// 視点
 };
 // ボーン行列(1番)

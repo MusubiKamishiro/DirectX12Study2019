@@ -24,7 +24,7 @@ struct Output
 	float4 shadowPos: SHADOW_POS;
 };
 
-// 頂点ｼｪｰﾀﾞ
+// 頂点シェーダ
 Output vs(float4 pos : POSITION, float4 normal : NORMAL, float2 uv : TEXCOORD)
 {
 	Output output;
@@ -36,7 +36,7 @@ Output vs(float4 pos : POSITION, float4 normal : NORMAL, float2 uv : TEXCOORD)
 	return output;
 }
 
-// ﾋﾟｸｾﾙｼｪｰﾀﾞ
+// ピクセルシェーダ
 float4 ps(Output output) : SV_TARGET
 {
 	float ld = output.shadowPos.z;	// ライトビュー変換後のz座標
