@@ -82,11 +82,12 @@ float4 ps(Output output) : SV_TARGET
 	for (int i = 0; i < 64; ++i)
 	{
 		//float len = SDFCircle3D(eye, float3(0, 0, 5), r);
-		float len = SDFLatticeCircle3D(abs(eye), r * 2, r / 2);
+		float len = SDFLatticeCircle3D(abs(eye), r * 4, r / 2);
 		eye += ray * len;
 		if (len < 0.001f)
 		{
-			return float4((float)(64- i) / 64.0f, (float)(64-i) / 64.0f, (float)(64-i) / 64.0f, 1);
+			//return float4((float)(64- i) / 64.0f, (float)(64-i) / 64.0f, (float)(64-i) / 64.0f, 1);
+			return float4(output.truePos.x / r, output.truePos.y / r, output.truePos.z / r, 1);
 		}
 	}
 	
